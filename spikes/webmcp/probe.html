@@ -1,0 +1,123 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WebMCP throwaway probe</title>
+<pre id="result">RUNNING</pre>
+<section id="case" data-version="0">not loaded</section>
+<script>
+  const output = document.querySelector("#result");
+  output.textContent = "SCRIPT_STARTED";
+  const caseView = document.querySelector("#case");
+  const checks = [];
+  const assert = (name, condition, detail = null) => {
+    checks.push({ name, pass: Boolean(condition), detail });
+    if (!condition) throw new Error(`${name}: ${JSON.stringify(detail)}`);
+  };
+  const observe = (name, condition, detail = null) => {
+    checks.push({ name, pass: Boolean(condition), detail });
+  };
+
+  const state = {
+    case: { id: "case_probe", version: 1, proposalStatus: "none" },
+  };
+
+  async function fetchCase() {
+    return structuredClone(state.case);
+  }
+
+  async function synchronizeCase(minimumVersion) {
+    const fresh = await fetchCase();
+    assert("ui-sync-version-floor", fresh.version >= minimumVersion, fresh);
+    caseView.dataset.version = String(fresh.version);
+    caseView.textContent = `${fresh.id}:${fresh.proposalStatus}:v${fresh.version}`;
+  }
+
+  async function submitProposal() {
+    state.case = { ...state.case, version: state.case.version + 1, proposalStatus: "pending" };
+    await synchronizeCase(state.case.version);
+    return { caseId: state.case.id, entityVersion: state.case.version };
+  }
+
+  const definitions = [
+    ["search_orders", true, true, async () => "[]"],
+    ["get_return_policy", true, false, async () => "{}"],
+    ["check_return_eligibility", true, true, async () => "{}"],
+    ["compare_resolution_options", true, false, async () => "[]"],
+    ["draft_customer_message", true, true, async () => "draft"],
+    ["submit_rma_for_approval", false, true, submitProposal],
+  ];
+
+  async function run() {
+    const context = document.modelContext;
+    assert("document-model-context-present", Boolean(context));
+    assert("register-tool-present", typeof context.registerTool === "function");
+    assert("get-tools-present", typeof context.getTools === "function");
+    assert("execute-tool-present", typeof context.executeTool === "function");
+
+    let toolChangeCount = 0;
+    context.addEventListener("toolchange", () => toolChangeCount += 1);
+
+    const registrationController = new AbortController();
+    for (const [name, readOnlyHint, untrustedContentHint, execute] of definitions) {
+      await context.registerTool({
+        name,
+        description: `Throwaway probe for ${name}`,
+        inputSchema: { type: "object", additionalProperties: false },
+        annotations: { readOnlyHint, untrustedContentHint },
+        execute,
+      }, { signal: registrationController.signal });
+    }
+
+    const tools = await context.getTools();
+    const probeTools = tools.filter(tool => definitions.some(([name]) => name === tool.name));
+    assert("six-tools-discoverable", probeTools.length === 6, probeTools.map(tool => tool.name));
+    const searchTool = probeTools.find(tool => tool.name === "search_orders");
+    const submitTool = probeTools.find(tool => tool.name === "submit_rma_for_approval");
+    assert("readonly-annotation-visible", searchTool.annotations?.readOnlyHint === true, searchTool.annotations);
+    assert("untrusted-annotation-visible", searchTool.annotations?.untrustedContentHint === true, searchTool.annotations);
+    assert("write-annotation-visible", submitTool.annotations?.readOnlyHint === false, submitTool.annotations);
+
+    await context.executeTool(submitTool, "{}");
+    assert("ui-refetched-after-write", caseView.textContent === "case_probe:pending:v2", caseView.textContent);
+
+    let executionObservedAbort = false;
+    const executionRegistration = new AbortController();
+    await context.registerTool({
+      name: "probe_cancellation",
+      description: "Throwaway cancellation probe",
+      inputSchema: { type: "object", additionalProperties: false },
+      execute: async (_input, { signal }) => new Promise((resolve, reject) => {
+        signal.addEventListener("abort", () => {
+          executionObservedAbort = true;
+          reject(signal.reason);
+        }, { once: true });
+        setTimeout(() => resolve("unexpected completion"), 5000);
+      }),
+    }, { signal: executionRegistration.signal });
+    const cancellationTool = (await context.getTools()).find(tool => tool.name === "probe_cancellation");
+    const invocationController = new AbortController();
+    const invocation = context.executeTool(cancellationTool, "{}", { signal: invocationController.signal });
+    setTimeout(() => invocationController.abort("probe-cancelled"), 20);
+    let callerObservedAbort = false;
+    await invocation.catch(() => callerObservedAbort = true);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert("caller-execution-aborted", callerObservedAbort);
+    observe("callback-signal-aborted", executionObservedAbort, "Chrome 151 does not currently propagate caller cancellation to the callback signal");
+    executionRegistration.abort();
+
+    registrationController.abort();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    const remaining = await context.getTools();
+    assert("abort-unregisters-tools", !remaining.some(tool => definitions.some(([name]) => name === tool.name)), remaining.map(tool => tool.name));
+    assert("toolchange-fired", toolChangeCount > 0, toolChangeCount);
+
+    return { status: checks.every(check => check.pass) ? "PASS" : "PARTIAL", checks, userAgent: navigator.userAgent };
+  }
+
+  run().then(result => {
+    output.textContent = JSON.stringify(result);
+    document.title = result.status === "PASS" ? "WEBMCP_PROBE_PASS" : "WEBMCP_PROBE_PARTIAL";
+  }).catch(error => {
+    output.textContent = JSON.stringify({ status: "FAIL", checks, error: String(error), stack: error.stack });
+    document.title = "WEBMCP_PROBE_FAIL";
+  });
+</script>
