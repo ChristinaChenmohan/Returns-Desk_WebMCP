@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "returns-desk",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-29",
+  "vars": { "APP_ENV": "development" },
+  "d1_databases": [{ "binding": "DB", "database_name": "returns-desk", "database_id": "local" }],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  }
+}
