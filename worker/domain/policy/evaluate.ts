@@ -293,7 +293,7 @@ function findAdjustmentConflicts(rules: readonly PolicyRule[]): PolicyConflictEv
     for (const field of ADJUSTMENT_FIELDS) {
       const assignments = group
         .filter(rule => rule.outcome[field] !== undefined)
-        .map(rule => ({ ruleId: rule.id, value: normalizedOutcomeValue(field, rule.outcome[field]) }));
+        .map(rule => ({ ruleId: rule.id, value: normalizePolicyOutcomeValue(field, rule.outcome[field]) }));
       if (new Set(assignments.map(item => JSON.stringify(item.value))).size > 1) {
         conflicts.push({
           layer,
@@ -357,7 +357,7 @@ function assignState<K extends keyof MutablePolicyState>(
   if (value !== undefined) state[key] = value;
 }
 
-function normalizedOutcomeValue(
+export function normalizePolicyOutcomeValue(
   field: keyof PolicyRuleOutcome,
   value: PolicyRuleOutcome[keyof PolicyRuleOutcome],
 ): unknown {

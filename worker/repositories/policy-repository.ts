@@ -25,7 +25,7 @@ interface PolicyRow {
   absolute_max_window_days: number;
   default_return_required: number;
   default_resolutions_json: string;
-  return_shipping_payer: ReturnShippingPayer;
+  return_shipping_payer: string;
 }
 
 interface RuleRow {
@@ -144,6 +144,64 @@ const ruleSchemas = {
   }).strict(),
 } satisfies Readonly<Record<PolicyRuleType, z.ZodType>>;
 
+export interface PolicyRuleDraftInput {
+  id: string;
+  ruleType: string;
+  priority: number;
+  conditions: unknown;
+  outcome: unknown;
+  explanation: string;
+  active: boolean;
+}
+
+export interface PolicyHeaderDefinition {
+  name: string;
+  defaultWindowDays: number;
+  absoluteMaxWindowDays: number;
+  defaultReturnRequired: boolean;
+  defaultResolutions: readonly ResolutionType[];
+  returnShippingPayer: string;
+}
+
+export function validatePolicyHeaderDefinition(input: PolicyHeaderDefinition): void {
+  const resolutions = new Set(input.defaultResolutions);
+  if (
+    input.name.trim().length < 1 || input.name.trim().length > 160
+    || !Number.isSafeInteger(input.defaultWindowDays)
+    || input.defaultWindowDays < 0 || input.defaultWindowDays > 3650
+    || !Number.isSafeInteger(input.absoluteMaxWindowDays)
+    || input.absoluteMaxWindowDays < input.defaultWindowDays
+    || input.absoluteMaxWindowDays > 3650
+    || typeof input.defaultReturnRequired !== "boolean"
+    || input.defaultResolutions.length < 1
+    || resolutions.size !== input.defaultResolutions.length
+    || !input.defaultResolutions.every(resolution => RESOLUTION_TYPES.has(resolution))
+    || (input.returnShippingPayer !== "merchant" && input.returnShippingPayer !== "customer")
+  ) {
+    throw invalidPolicy();
+  }
+}
+
+export function validatePolicyRuleDraft(input: PolicyRuleDraftInput): PolicyRule {
+  if (
+    input.id.length < 1 || input.id.length > 64
+    || !isRuleType(input.ruleType)
+    || !Number.isSafeInteger(input.priority) || Math.abs(input.priority) > 1_000_000
+    || input.explanation.length < 1 || input.explanation.length > 500
+  ) {
+    throw invalidPolicy();
+  }
+  return toRule({
+    id: input.id,
+    rule_type: input.ruleType,
+    priority: input.priority,
+    conditions_json: JSON.stringify(input.conditions),
+    outcome_json: JSON.stringify(input.outcome),
+    explanation_template: input.explanation,
+    active: input.active ? 1 : 0,
+  });
+}
+
 export class PolicyRepository {
   constructor(private readonly db: D1Database) {}
 
@@ -163,6 +221,18 @@ export class PolicyRepository {
         WHERE session_id = ? AND policy_version_id = ?
         ORDER BY id`,
     ).bind(sessionId, policyVersionId).all<RuleRow>();
+    const defaultResolutions = parseResolutions(row.default_resolutions_json);
+    if (row.default_return_required !== 0 && row.default_return_required !== 1) {
+      throw invalidPolicy();
+    }
+    validatePolicyHeaderDefinition({
+      name: row.name,
+      defaultWindowDays: row.default_window_days,
+      absoluteMaxWindowDays: row.absolute_max_window_days,
+      defaultReturnRequired: row.default_return_required === 1,
+      defaultResolutions,
+      returnShippingPayer: row.return_shipping_payer,
+    });
     return {
       id: row.id,
       name: row.name,
@@ -170,8 +240,8 @@ export class PolicyRepository {
       defaultWindowDays: row.default_window_days,
       absoluteMaxWindowDays: row.absolute_max_window_days,
       defaultReturnRequired: row.default_return_required === 1,
-      defaultResolutions: parseResolutions(row.default_resolutions_json),
-      returnShippingPayer: row.return_shipping_payer,
+      defaultResolutions,
+      returnShippingPayer: row.return_shipping_payer as ReturnShippingPayer,
       eligibilityTtlMinutes: 15,
       rules: ruleRows.results.map(toRule),
     };

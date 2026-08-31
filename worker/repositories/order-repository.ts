@@ -28,6 +28,73 @@ interface VariantRow {
   price_cents: number;
 }
 
+interface OrderSearchRow {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  email_normalized: string;
+  delivered_at: string | null;
+  matched_by: "order_number" | "customer_name" | "email";
+}
+
+interface OrderDetailRow {
+  id: string;
+  order_number: string;
+  customer_name: string;
+  email_normalized: string;
+  currency: string;
+  status: string;
+  ordered_at: string;
+  fulfilled_at: string | null;
+  delivered_at: string | null;
+}
+
+interface OrderItemDetailRow {
+  id: string;
+  variant_id: string;
+  sku: string;
+  product_title: string;
+  variant_title: string;
+  quantity: number;
+  unit_price_cents: number;
+  fulfilled_quantity: number;
+  previously_returned_quantity: number;
+  policy_version_id: string;
+}
+
+export interface RepositoryOrderSummary {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  deliveredAt: string | null;
+  matchedBy: OrderSearchRow["matched_by"];
+}
+
+export interface RepositoryOrderDetails {
+  id: string;
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  currency: string;
+  status: string;
+  orderedAt: string;
+  fulfilledAt: string | null;
+  deliveredAt: string | null;
+  items: readonly {
+    id: string;
+    variantId: string;
+    sku: string;
+    productTitle: string;
+    variantTitle: string;
+    quantity: number;
+    unitPriceCents: number;
+    fulfilledQuantity: number;
+    previouslyReturnedQuantity: number;
+    policyVersionId: string;
+  }[];
+}
+
 export interface EligibilityOrderFacts {
   orderId: string;
   customerId: string;
@@ -48,6 +115,93 @@ export interface EligibilityOrderFacts {
 
 export class OrderRepository {
   constructor(private readonly db: D1Database) {}
+
+  async search(sessionId: string, query: string, limit: number): Promise<RepositoryOrderSummary[]> {
+    const escaped = query.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_");
+    const pattern = `%${escaped.toLowerCase()}%`;
+    const rows = await this.db.prepare(
+      `SELECT o.id, o.order_number, c.name AS customer_name,
+              c.email_normalized, o.delivered_at,
+              CASE
+                WHEN lower(o.order_number) LIKE ? ESCAPE '\\' THEN 'order_number'
+                WHEN lower(c.name) LIKE ? ESCAPE '\\' THEN 'customer_name'
+                ELSE 'email'
+              END AS matched_by
+         FROM orders o
+         JOIN customers c ON c.session_id = o.session_id AND c.id = o.customer_id
+        WHERE o.session_id = ? AND c.session_id = ?
+          AND (lower(o.order_number) LIKE ? ESCAPE '\\'
+            OR lower(c.name) LIKE ? ESCAPE '\\'
+            OR lower(c.email_normalized) LIKE ? ESCAPE '\\')
+        ORDER BY o.order_number, o.id
+        LIMIT ?`,
+    ).bind(pattern, pattern, sessionId, sessionId, pattern, pattern, pattern, limit)
+      .all<OrderSearchRow>();
+    return rows.results.map(row => ({
+      id: row.id,
+      orderNumber: row.order_number,
+      customerName: row.customer_name,
+      customerEmail: row.email_normalized,
+      deliveredAt: row.delivered_at,
+      matchedBy: row.matched_by,
+    }));
+  }
+
+  async findDetails(sessionId: string, orderId: string): Promise<RepositoryOrderDetails | null> {
+    const order = await this.db.prepare(
+      `SELECT o.id, o.order_number, c.name AS customer_name, c.email_normalized,
+              o.currency, o.status, o.ordered_at, o.fulfilled_at, o.delivered_at
+         FROM orders o
+         JOIN customers c ON c.session_id = o.session_id AND c.id = o.customer_id
+        WHERE o.session_id = ? AND c.session_id = ? AND o.id = ?`,
+    ).bind(sessionId, sessionId, orderId).first<OrderDetailRow>();
+    if (order === null) return null;
+    const items = await this.db.prepare(
+      `SELECT oi.id, oi.variant_id, pv.sku, p.title AS product_title,
+              pv.title AS variant_title, oi.quantity, oi.unit_price_cents,
+              oi.fulfilled_quantity, oi.previously_returned_quantity,
+              oi.policy_version_id
+         FROM order_items oi
+         JOIN product_variants pv
+           ON pv.session_id = oi.session_id AND pv.id = oi.variant_id
+         JOIN products p ON p.session_id = pv.session_id AND p.id = pv.product_id
+        WHERE oi.session_id = ? AND pv.session_id = ? AND p.session_id = ?
+          AND oi.order_id = ?
+        ORDER BY oi.id`,
+    ).bind(sessionId, sessionId, sessionId, orderId).all<OrderItemDetailRow>();
+    return {
+      id: order.id,
+      orderNumber: order.order_number,
+      customerName: order.customer_name,
+      customerEmail: order.email_normalized,
+      currency: order.currency,
+      status: order.status,
+      orderedAt: order.ordered_at,
+      fulfilledAt: order.fulfilled_at,
+      deliveredAt: order.delivered_at,
+      items: items.results.map(item => ({
+        id: item.id,
+        variantId: item.variant_id,
+        sku: item.sku,
+        productTitle: item.product_title,
+        variantTitle: item.variant_title,
+        quantity: item.quantity,
+        unitPriceCents: item.unit_price_cents,
+        fulfilledQuantity: item.fulfilled_quantity,
+        previouslyReturnedQuantity: item.previously_returned_quantity,
+        policyVersionId: item.policy_version_id,
+      })),
+    };
+  }
+
+  async findVariantInventory(sessionId: string, variantId: string): Promise<ReplacementVariantFact | null> {
+    const row = await this.db.prepare(
+      `SELECT id, sku, active, inventory_quantity, inventory_version, price_cents
+         FROM product_variants
+        WHERE session_id = ? AND id = ?`,
+    ).bind(sessionId, variantId).first<VariantRow>();
+    return row === null ? null : toVariant(row);
+  }
 
   async findEligibilityFacts(
     sessionId: string,
@@ -104,15 +258,19 @@ export class OrderRepository {
          FROM product_variants
         WHERE session_id = ? AND product_id = ? AND id = ?`,
     ).bind(sessionId, productId, variantId).first<VariantRow>();
-    return row === null ? null : {
-      id: row.id,
-      sku: row.sku,
-      active: row.active === 1,
-      inventoryQuantity: row.inventory_quantity,
-      inventoryVersion: row.inventory_version,
-      unitPriceCents: row.price_cents,
-    };
+    return row === null ? null : toVariant(row);
   }
+}
+
+function toVariant(row: VariantRow): ReplacementVariantFact {
+  return {
+    id: row.id,
+    sku: row.sku,
+    active: row.active === 1,
+    inventoryQuantity: row.inventory_quantity,
+    inventoryVersion: row.inventory_version,
+    unitPriceCents: row.price_cents,
+  };
 }
 
 function mapAllowedConditions(value: string): readonly ConditionCode[] {
