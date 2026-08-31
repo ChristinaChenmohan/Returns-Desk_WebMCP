@@ -5,7 +5,7 @@ import { OrderRepository } from "../repositories/order-repository";
 export class DemoCommerceAdapter implements CommerceAdapter {
   private readonly orders: OrderRepository;
 
-  constructor(db: D1Database) {
+  constructor(private readonly db: D1Database) {
     this.orders = new OrderRepository(db);
   }
 
@@ -33,7 +33,7 @@ export class DemoCommerceAdapter implements CommerceAdapter {
       orderedAt: order.orderedAt,
       fulfilledAt: order.fulfilledAt,
       deliveredAt: order.deliveredAt,
-      items: order.items.map(item => ({
+      items: await Promise.all(order.items.map(async item => ({
         orderItemId: item.id,
         variantId: item.variantId,
         sku: item.sku,
@@ -43,8 +43,13 @@ export class DemoCommerceAdapter implements CommerceAdapter {
         unitPriceCents: item.unitPriceCents,
         fulfilledQuantity: item.fulfilledQuantity,
         previouslyReturnedQuantity: item.previouslyReturnedQuantity,
+        remainingReturnableQuantity: item.fulfilledQuantity - item.previouslyReturnedQuantity,
+        replacementVariants: (await this.db.prepare(`SELECT v.id, v.sku, v.title, v.inventory_quantity AS inventoryQuantity
+          FROM product_variants v JOIN product_variants original ON original.session_id = v.session_id AND original.product_id = v.product_id
+          WHERE v.session_id = ? AND original.id = ? AND v.id <> original.id AND v.active = 1 ORDER BY v.sku`)
+          .bind(sessionId, item.variantId).all<{ id: string; sku: string; title: string; inventoryQuantity: number }>()).results,
         policyVersionId: item.policyVersionId,
-      })),
+      }))),
     };
   }
 

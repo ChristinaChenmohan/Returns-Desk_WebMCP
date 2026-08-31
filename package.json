@@ -13,7 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run build",
+    "check": "node scripts/check.mjs",
     "deploy": "wrangler deploy"
   },
   "keywords": [],

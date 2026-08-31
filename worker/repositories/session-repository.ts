@@ -37,6 +37,12 @@ export class SessionRepository {
     private readonly ids: IdGenerator = cryptoIds,
   ) {}
 
+  async getExisting(id: string): Promise<DemoSession | null> {
+    const row = await this.db.prepare(`SELECT id, created_at, expires_at, seed_version, reset_count
+      FROM demo_sessions WHERE id = ? AND expires_at > ?`).bind(id, this.clock.now().toISOString()).first<DemoSessionRow>();
+    return row === null ? null : toDemoSession(row);
+  }
+
   async getOrCreate(cookieId: string | null): Promise<DemoSession> {
     const now = this.clock.now();
     const nowIso = now.toISOString();

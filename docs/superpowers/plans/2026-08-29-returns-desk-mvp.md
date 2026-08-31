@@ -79,7 +79,7 @@
 - Consumes: none.
 - Produces: `Env { DB: D1Database; ASSETS: Fetcher; APP_ENV: string }`, a Worker fetch entry point, the React mount point, and the standard commands used by every later task.
 
-- [ ] **Step 1: Initialize Git and preserve the approved design baseline**
+- [x] **Step 1: Initialize Git and preserve the approved design baseline**
 
 Run:
 
@@ -91,7 +91,7 @@ git commit -m "docs: establish returns desk specification"
 
 Expected: the first commit contains only approved design documents, the final plan, and the explicitly throwaway Spike harness. After this commit, the execution driver may use `superpowers:using-git-worktrees` before Task 2.
 
-- [ ] **Step 2: Initialize npm and install the locked dependency set**
+- [x] **Step 2: Initialize npm and install the locked dependency set**
 
 Run:
 
@@ -103,7 +103,7 @@ npm install -D typescript vite @vitejs/plugin-react @cloudflare/vite-plugin @clo
 
 Expected: `package-lock.json` records resolved versions and `npm audit` reports no unreviewed critical vulnerability.
 
-- [ ] **Step 3: Add a failing runtime smoke test**
+- [x] **Step 3: Add a failing runtime smoke test**
 
 Create `test/unit/smoke.test.ts`:
 
@@ -120,13 +120,13 @@ describe("worker", () => {
 });
 ```
 
-- [ ] **Step 4: Run the test and verify the missing entry point failure**
+- [x] **Step 4: Run the test and verify the missing entry point failure**
 
 Run: `npx vitest run test/unit/smoke.test.ts`
 
 Expected: FAIL because `worker/index.ts` does not exist.
 
-- [ ] **Step 5: Add strict configuration and minimal Worker/UI entry points**
+- [x] **Step 5: Add strict configuration and minimal Worker/UI entry points**
 
 Set scripts in `package.json`:
 
@@ -191,7 +191,7 @@ Configure `wrangler.jsonc` for local development as follows; Task 14 records the
 
 Configure `vite.config.ts` with `react()` and `cloudflare()`.
 
-- [ ] **Step 6: Prove the scaffold passes and commit**
+- [x] **Step 6: Prove the scaffold passes and commit**
 
 Run:
 
@@ -224,7 +224,7 @@ Expected: all commands exit 0; build emits Worker and SPA assets.
 - Consumes: Zod.
 - Produces: `DomainError`, `Clock`, `IdGenerator`, `ToolName`, six input schemas, `SuccessEnvelope<T>`, `ErrorEnvelope`, `EffectRef`, and shared enums used by every API/UI/domain module.
 
-- [ ] **Step 1: Write failing schema and error tests**
+- [x] **Step 1: Write failing schema and error tests**
 
 Create `test/contract/schemas.test.ts`:
 
@@ -254,13 +254,13 @@ describe("tool contracts", () => {
 });
 ```
 
-- [ ] **Step 2: Run the contract test red**
+- [x] **Step 2: Run the contract test red**
 
 Run: `npx vitest run test/contract/schemas.test.ts`
 
 Expected: FAIL because shared schemas do not exist.
 
-- [ ] **Step 3: Implement exact shared types and strict Zod schemas**
+- [x] **Step 3: Implement exact shared types and strict Zod schemas**
 
 Use these stable interfaces in `common.ts` and `errors.ts`:
 
@@ -291,7 +291,7 @@ export class DomainError extends Error {
 
 Export `reasonCode`, `conditionCode`, `resolutionType`, `eligibilityStatus`, and `proposalStatus` Zod enums. Implement all six schemas verbatim from `项目设计/API与WebMCP详细契约.md` with `.strict()`. Export `toolNames` as the literal array tested above.
 
-- [ ] **Step 4: Add deterministic test primitives**
+- [x] **Step 4: Add deterministic test primitives**
 
 Create `worker/domain/primitives.ts`:
 
@@ -306,7 +306,7 @@ export const cryptoIds: IdGenerator = {
 
 Create fixed implementations in `test/fixtures/runtime.ts` returning `2026-08-29T07:00:00Z` and deterministic sequential IDs.
 
-- [ ] **Step 5: Run all schema checks and commit**
+- [x] **Step 5: Run all schema checks and commit**
 
 Run:
 
@@ -339,7 +339,7 @@ Expected: contract tests pass and no `any` is introduced.
 - Consumes: `Clock`, `IdGenerator`, `Env.DB`.
 - Produces: all tables/constraints from the data model, `SessionRepository.getOrCreate(cookieId)`, `seedDemoSession(db, sessionId)`, and `ResetService.reset(command)`.
 
-- [ ] **Step 1: Write failing migration invariant tests**
+- [x] **Step 1: Write failing migration invariant tests**
 
 Create `test/integration/schema.test.ts` asserting:
 
@@ -358,13 +358,13 @@ it("rejects a second RMA for one proposal", async () => {
 
 Use `@cloudflare/vitest-plugin` setup with `readD1Migrations()` and `applyD1Migrations()`.
 
-- [ ] **Step 2: Run migration tests red**
+- [x] **Step 2: Run migration tests red**
 
 Run: `npx vitest run test/integration/schema.test.ts`
 
 Expected: FAIL because migrations/tables are absent.
 
-- [ ] **Step 3: Implement the complete initial migration**
+- [x] **Step 3: Implement the complete initial migration**
 
 Create every table in `项目设计/数据模型.md`, including `inventory_version`, mutable aggregate `version`, foreign keys, nonnegative CHECK constraints, an `idempotency_records` table keyed by Session + command kind + key with request hash/result reference, and a `rate_limit_buckets` table keyed by bucket kind plus one-way Session/IP digest. Add these indexes:
 
@@ -382,7 +382,7 @@ CREATE UNIQUE INDEX ux_store_credit_rma ON store_credits(rma_id);
 
 Add a trigger rejecting proposal transitions unless `OLD.status = 'pending'`, except an idempotent no-op to the same terminal value.
 
-- [ ] **Step 4: Add Session seed and Reset red/green tests**
+- [x] **Step 4: Add Session seed and Reset red/green tests**
 
 Test that two Session IDs receive distinct seeded rows, Reset increments `seed_version`, removes only the target Session's business rows, reseeds deterministic Demo scenarios, and leaves Session B untouched. Implement `ResetService.reset({ sessionId, expectedSeedVersion, idempotencyKey })` as one D1 batch ending with `demo.reset` audit.
 
@@ -396,7 +396,7 @@ await db.batch([
 ]);
 ```
 
-- [ ] **Step 5: Verify migrations from an empty database and commit**
+- [x] **Step 5: Verify migrations from an empty database and commit**
 
 Run:
 
@@ -431,7 +431,7 @@ Expected: empty-database migration succeeds; isolation and Reset tests pass.
 - Consumes: `SessionRepository`, `DomainError`, shared envelopes.
 - Produces: `RequestContext { sessionId, seedVersion, csrfToken, actor, requestId }`, signed human/agent channel tokens, `requireCapability(name)`, `requireCsrf()`, and `createApp(deps)` used by all routes.
 
-- [ ] **Step 1: Write failing CSRF, Origin, IDOR-shaping, and header tests**
+- [x] **Step 1: Write failing CSRF, Origin, IDOR-shaping, and header tests**
 
 ```ts
 it.each([
@@ -454,13 +454,13 @@ it("does not let an agent channel token call a human route", async () => {
 });
 ```
 
-- [ ] **Step 2: Run middleware tests red**
+- [x] **Step 2: Run middleware tests red**
 
 Run: `npx vitest run test/contract/security-middleware.test.ts test/contract/error-envelope.test.ts`
 
 Expected: FAIL because `createApp` and middleware are missing.
 
-- [ ] **Step 3: Implement request context and capability guards**
+- [x] **Step 3: Implement request context and capability guards**
 
 Define explicit capability constants. At bootstrap, issue separate short-lived HMAC-signed `human` and `agent` channel tokens bound to Session ID, seedVersion, expiry, and allowed capability class. The UI HTTP client retains only the human token; the WebMCP adapter closure receives only the agent token. Map each route to one constant at registration time and derive actor from the verified token:
 
@@ -477,7 +477,7 @@ export function requireCapability(required: Capability) {
 
 Never accept `actorType` or `sessionId` from request JSON/query.
 
-- [ ] **Step 4: Implement stable envelopes and security headers**
+- [x] **Step 4: Implement stable envelopes and security headers**
 
 Map `DomainError` to the exact error shape in the detailed contract. Unknown errors return `INTERNAL_ERROR`, correlationId, status 500, and no exception text. Add CSP, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`, and frame policy. Add per-route body size and string limits before domain calls.
 
@@ -496,7 +496,7 @@ export function mapError(error: unknown, correlationId: string): Response {
 }
 ```
 
-- [ ] **Step 5: Prove security contracts and commit**
+- [x] **Step 5: Prove security contracts and commit**
 
 Run:
 
@@ -532,7 +532,7 @@ Expected: tests prove CSRF/Origin/capability failures and safe envelopes.
 - Consumes: shared enums, `Clock`, repositories.
 - Produces: `evaluateEligibility(input, policy): EligibilityDecision`, `EligibilityService.check(command, context)`, and immutable eligibility snapshots.
 
-- [ ] **Step 1: Write table-driven failing policy tests**
+- [x] **Step 1: Write table-driven failing policy tests**
 
 Cover boundary time, undelivered, zero/excess quantity, Final Sale normal reasons, damage exception, condition conflicts, priority override, same-priority conflict, inventory zero, consent, rounding, and `returnRequired`:
 
@@ -546,13 +546,13 @@ it.each([
 });
 ```
 
-- [ ] **Step 2: Run the matrix red**
+- [x] **Step 2: Run the matrix red**
 
 Run: `npx vitest run test/unit/policy-engine.test.ts test/unit/policy-matrix.test.ts`
 
 Expected: FAIL because `evaluateEligibility` is missing.
 
-- [ ] **Step 3: Implement the five-layer policy algorithm**
+- [x] **Step 3: Implement the five-layer policy algorithm**
 
 Sort by fixed layer, descending priority, ascending rule ID. Return `POLICY_RULE_CONFLICT` for same-priority conflicting terminal/field outcomes. Generate at least one allowed resolution for eligible; remove only exchange when inventory is unavailable. Compute `inputHash` from canonical JSON containing every fact listed in the policy spec.
 
@@ -564,7 +564,7 @@ if (conflict) return needsReview("POLICY_RULE_CONFLICT", conflict);
 return finalizeDecision(applyRules(baseDecision(input), ordered));
 ```
 
-- [ ] **Step 4: Write and pass service persistence tests**
+- [x] **Step 4: Write and pass service persistence tests**
 
 Test that checking eligibility creates/updates the Case, stores an immutable snapshot, increments Case version, deduplicates identical idempotency keys, rejects a reused key with a different hash, and returns `needs_review` without enabling proposal submission. Implement repositories with `session_id` in every SQL predicate.
 
@@ -580,7 +580,7 @@ const row = await db.prepare(
 ).bind(checkId, context.sessionId).first();
 ```
 
-- [ ] **Step 5: Run policy/eligibility suites and commit**
+- [x] **Step 5: Run policy/eligibility suites and commit**
 
 Run:
 
@@ -619,7 +619,7 @@ Expected: the complete policy matrix and immutable persistence tests pass.
 - Consumes: order/policy/eligibility repositories.
 - Produces: `CommerceAdapter`, `DemoCommerceAdapter`, `OrderService.search`, `PolicyReadService.getLockedPolicy`, `PolicyAdminService`, `ResolutionService.compare`, `MessageService.draft`, and query services for Dashboard, Case Workspace, Approval Queue, and Activity.
 
-- [ ] **Step 1: Write failing behavior tests**
+- [x] **Step 1: Write failing behavior tests**
 
 Assert search caps at five and masks email, multiple results set `requiresSelection`, locked policy is used instead of active policy, comparison never adds a solution, missing facts produce `missingInformation` with no invented message, Case queries return a monotonically increasing version, and approval queues expose only pending/reviewable rows.
 
@@ -630,13 +630,13 @@ expect(await messages.draft(missingFacts)).toEqual({
 });
 ```
 
-- [ ] **Step 2: Run targeted tests red**
+- [x] **Step 2: Run targeted tests red**
 
 Run: `npx vitest run test/unit/resolution-service.test.ts test/unit/message-service.test.ts test/integration/order-search.test.ts test/integration/policy-admin.test.ts test/integration/workspace-queries.test.ts`
 
 Expected: FAIL because services are absent.
 
-- [ ] **Step 3: Implement safe reads and deterministic ranking**
+- [x] **Step 3: Implement safe reads and deterministic ranking**
 
 Define `CommerceAdapter` with `searchOrders`, `getOrder`, and `getVariantInventory`; implement `DemoCommerceAdapter` over Session-scoped repositories. Use server-calculated `merchantCostCents`; rank by the requested preference with stable resolution-type tie breaking. Return only masked customer data in search results. Keep customer names, titles, and notes out of policy explanations.
 
@@ -648,7 +648,7 @@ export interface CommerceAdapter {
 }
 ```
 
-- [ ] **Step 4: Implement controlled templates, workspace queries, and policy administration**
+- [x] **Step 4: Implement controlled templates, workspace queries, and policy administration**
 
 Templates interpolate only a typed fact map. Do not accept arbitrary HTML and always set `sendStatus: "not_sent"`. Do not persist drafts; write only a minimal `message.drafted` audit summary. Workspace query services return safe aggregates and cursor pages without policy calculations. `PolicyAdminService` only mutates draft versions, validates the supported rule catalog and conflicts, then activates the draft and retires the former active version in one D1 batch.
 
@@ -660,7 +660,7 @@ export interface PolicyAdminService {
 }
 ```
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run:
 
@@ -687,7 +687,7 @@ git commit -m "feat: add return read and drafting services"
 - Consumes: eligibility, Case, and proposal repositories.
 - Produces: `ProposalService.submit/read/reject/replace`, `EligibilityReviewService.review`, terminal transition enforcement, and lazy expiry.
 
-- [ ] **Step 1: Write failing state transition tests**
+- [x] **Step 1: Write failing state transition tests**
 
 ```ts
 it.each(["approved", "rejected", "expired", "superseded", "invalidated"] as const)(
@@ -697,13 +697,13 @@ it.each(["approved", "rejected", "expired", "superseded", "invalidated"] as cons
 
 Add integration tests for same-key replay, different-payload reuse, one pending per Case, Agent conflict, exactly one expiry event, explicit human reject, and transactional replace.
 
-- [ ] **Step 2: Run proposal tests red**
+- [x] **Step 2: Run proposal tests red**
 
 Run: `npx vitest run test/unit/proposal-transitions.test.ts test/integration/proposal-service.test.ts`
 
 Expected: FAIL because proposal services are missing.
 
-- [ ] **Step 3: Implement submit and lazy expiry**
+- [x] **Step 3: Implement submit and lazy expiry**
 
 Canonicalize the submission payload, hash it, and return the original proposal for same key/hash. `read()` performs `UPDATE ... WHERE status='pending' AND expires_at <= ?`, checks affected rows, and writes `rma_proposal.expired` only for the winning request.
 
@@ -719,7 +719,7 @@ WHERE id = ?
 if (expired.meta.changes === 1) await audit.append("rma_proposal.expired", proposalId);
 ```
 
-- [ ] **Step 4: Implement human review/reject/replace**
+- [x] **Step 4: Implement human review/reject/replace**
 
 Review creates a child eligibility snapshot with `parentCheckId` and human metadata. Replace batches: insert new pending → update old to superseded → link `superseded_by_proposal_id` → write two audit events; any failure rolls back. Agent capability is not accepted by these methods.
 
@@ -731,7 +731,7 @@ export interface ProposalService {
 }
 ```
 
-- [ ] **Step 5: Verify all state paths and commit**
+- [x] **Step 5: Verify all state paths and commit**
 
 Run:
 
@@ -759,7 +759,7 @@ Expected: all six terminal states and idempotency/concurrency cases pass.
 - Consumes: pending proposal snapshot and D1 batch API.
 - Produces: `ApprovalService.approve(command, humanContext): Promise<ApprovalResult>` returning one completed RMA or a committed invalidated result.
 
-- [ ] **Step 1: Write failing rollback and concurrency tests**
+- [x] **Step 1: Write failing rollback and concurrency tests**
 
 Cover refund, credit, exchange, all three return-label combinations, duplicate approval, two approvals of the last inventory unit, quantity race, stale eligibility, Reset race, and injected failure after each batch statement.
 
@@ -770,13 +770,13 @@ expect(await inventory("var_last")).toBe(0);
 expect(await committedReservations("var_last")).toHaveLength(1);
 ```
 
-- [ ] **Step 2: Run approval tests red**
+- [x] **Step 2: Run approval tests red**
 
 Run: `npx vitest run test/integration/approval-transaction.test.ts test/integration/approval-concurrency.test.ts`
 
 Expected: FAIL because approval batching is missing.
 
-- [ ] **Step 3: Add database approval guards**
+- [x] **Step 3: Add database approval guards**
 
 Create a `BEFORE UPDATE OF status` trigger for `status='approved'` that raises `ABORT` unless exactly one completed RMA, one RMA item, the correct solution-specific effect, the exchange committed reservation, and the conditional label are present. The trigger makes the final proposal transition a transaction guard; any missing artifact rolls back the entire D1 batch.
 
@@ -795,7 +795,7 @@ END;
 
 Extend the trigger with branch-specific EXISTS/NOT EXISTS checks for refund, store credit, exchange committed reservation, and `return_required` label.
 
-- [ ] **Step 4: Implement branch-specific prepared-statement batches**
+- [x] **Step 4: Implement branch-specific prepared-statement batches**
 
 For exchange, batch in this order: insert unique RMA from valid pending proposal → conditionally increment returned quantity → insert RMA item only when `changes() = 1` → conditionally decrement inventory → insert committed reservation only when `changes() = 1` → optional label → audit rows → update proposal to approved last. Refund and credit use equivalent branch-specific effects. On guard/business failure, run a separate conditional invalidation batch; on D1/technical failure, leave pending and rethrow safe 503.
 
@@ -813,7 +813,7 @@ const results = await db.batch([
 return decodeApprovalBatch(results);
 ```
 
-- [ ] **Step 5: Prove atomicity, then commit**
+- [x] **Step 5: Prove atomicity, then commit**
 
 Run:
 
@@ -847,17 +847,17 @@ Expected: every fault injection leaves zero partial effects; concurrent approval
 - Consumes: all domain services and security middleware.
 - Produces: every route, method, status, envelope, effect, and error code in `项目设计/API与WebMCP详细契约.md`.
 
-- [ ] **Step 1: Write a failing route inventory contract test**
+- [x] **Step 1: Write a failing route inventory contract test**
 
 Define the expected method/path/capability table in the test and assert every entry responds with something other than 404 under a valid fixture Session. Separately assert no `/approve`, `/reject`, `/review`, `/replace`, `/reset`, or policy mutation route accepts Agent capability.
 
-- [ ] **Step 2: Run the API contract red**
+- [x] **Step 2: Run the API contract red**
 
 Run: `npx vitest run test/contract/api-routes.test.ts test/contract/api-fixtures.test.ts`
 
 Expected: FAIL listing unregistered routes.
 
-- [ ] **Step 3: Implement read and safe-compute routes**
+- [x] **Step 3: Implement read and safe-compute routes**
 
 Parse path/query/body with the shared Zod schemas, call exactly one service method per handler, and return success envelopes with requestId/serverTime/seedVersion. Add cursor caps and search limit 5.
 
@@ -869,7 +869,7 @@ routes.post("/eligibility-checks", requireCapability("eligibility.check"), requi
 });
 ```
 
-- [ ] **Step 4: Implement write and human-only routes**
+- [x] **Step 4: Implement write and human-only routes**
 
 Lift `Idempotency-Key`, expected versions, Session, CSRF, and actor into command context. Map pending conflicts to 409, invalid domain inputs to 422, and deterministic eligibility outcomes to 200/201 rather than exceptions. Never expose SQL/stack details.
 
@@ -881,7 +881,7 @@ const commandContext = {
 };
 ```
 
-- [ ] **Step 5: Snapshot all fixtures and commit**
+- [x] **Step 5: Snapshot all fixtures and commit**
 
 Run:
 

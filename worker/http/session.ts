@@ -4,10 +4,11 @@ import type { Clock } from "../domain/primitives";
 import type { SessionRepository } from "../repositories/session-repository";
 import type { AppEnvironment } from "./context";
 import { issueCsrfToken } from "./csrf";
+import { DomainError } from "../domain/errors";
 
 export const SESSION_COOKIE_NAME = "returns_desk_session";
 
-type SessionReader = Pick<SessionRepository, "getOrCreate">;
+type SessionReader = Pick<SessionRepository, "getOrCreate"> & Partial<Pick<SessionRepository, "getExisting">>;
 
 function readCookie(header: string | undefined, name: string): string | null {
   if (header === undefined) return null;
@@ -34,10 +35,14 @@ export function createSessionMiddleware(
   repository: SessionReader,
   signingKey: string,
   clock: Clock,
+  requireExisting = false,
 ) {
   return createMiddleware<AppEnvironment>(async (c, next) => {
     const cookieId = readCookie(c.req.header("cookie"), SESSION_COOKIE_NAME);
-    const session = await repository.getOrCreate(cookieId);
+    if (requireExisting && cookieId === null) throw new DomainError("SESSION_EXPIRED", 401, false, "bootstrap_session");
+    const session = requireExisting && repository.getExisting
+      ? await repository.getExisting(cookieId!) : await repository.getOrCreate(cookieId);
+    if (session === null || (requireExisting && session.id !== cookieId)) throw new DomainError("SESSION_EXPIRED", 401, false, "bootstrap_session");
     const csrfToken = await issueCsrfToken({
       signingKey,
       sessionId: session.id,

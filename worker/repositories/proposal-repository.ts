@@ -478,7 +478,7 @@ export class ProposalRepository {
 
 type SqlValue = ArrayBuffer | null | number | string;
 
-function proposalFactScope(
+export function proposalFactScope(
   record: ProposalRecord,
   guard: ProposalFactGuard,
 ): { joins: string; conditions: string; values: readonly SqlValue[] } {

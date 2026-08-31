@@ -29,6 +29,8 @@ export interface OrderDetails {
     unitPriceCents: number;
     fulfilledQuantity: number;
     previouslyReturnedQuantity: number;
+    remainingReturnableQuantity: number;
+    replacementVariants: readonly { id: string; sku: string; inventoryQuantity: number; title: string }[];
     policyVersionId: string;
   }[];
 }

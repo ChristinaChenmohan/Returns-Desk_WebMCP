@@ -11,10 +11,14 @@ import { mapError } from "./http/error-mapper";
 import { securityHeaders } from "./http/security-headers";
 import { createSessionMiddleware } from "./http/session";
 import type { SessionRepository } from "./repositories/session-repository";
+import { apiRoutes } from "./routes";
+import { consumeRateLimit, rateLimitDigest } from "./http/rate-limit";
+import { safeLog, type SafeLog } from "./http/safe-logger";
 
-type SessionReader = Pick<SessionRepository, "getOrCreate">;
+type SessionReader = Pick<SessionRepository, "getOrCreate"> & Partial<Pick<SessionRepository, "getExisting">>;
 
 export type AppDependencies = {
+  db?: D1Database;
   sessionRepository: SessionReader;
   channelSigningKey: string;
   clock?: Clock;
@@ -22,6 +26,7 @@ export type AppDependencies = {
   allowedOrigin?: string;
   assets?: Fetcher;
   enableTestRoutes?: boolean;
+  logSink?: (entry: SafeLog) => void;
 };
 
 type TestWriteBody = {
@@ -104,8 +109,18 @@ export function createApp(dependencies: AppDependencies) {
 
   app.use("*", securityHeaders());
   app.use("*", createRequestContextMiddleware(clock, ids));
+  app.use("/api/*", async (c, next) => {
+    const started = performance.now(); await next();
+    if (dependencies.logSink) safeLog({ requestId: c.get("requestContext").requestId, route: c.req.routePath, status: c.res.status, durationMs: performance.now() - started }, dependencies.logSink);
+  });
+  app.use("/api/*", async (c, next) => { await next(); c.header("Cache-Control", "no-store"); });
 
-  app.onError((error, c) => mapError(error, c.get("requestContext"), clock.now()));
+  app.onError((error, c) => {
+    if (dependencies.logSink) safeLog({ requestId: c.get("requestContext").requestId, route: c.req.routePath, errorCode: error instanceof DomainError ? error.code : "INTERNAL_ERROR" }, dependencies.logSink);
+    const response = mapError(error, c.get("requestContext"), clock.now());
+    if (error instanceof DomainError && error.code === "RATE_LIMITED") response.headers.set("Retry-After", "60");
+    return response;
+  });
 
   app.get("/api/v1/health", c =>
     jsonSuccess({ status: "ok" }, c.get("requestContext"), clock.now()),
@@ -191,6 +206,28 @@ export function createApp(dependencies: AppDependencies) {
     });
   }
 
+  if (dependencies.db) {
+    const existingSession = createSessionMiddleware(dependencies.sessionRepository, dependencies.channelSigningKey, clock, true);
+    app.get("/api/v1/session/agent-bootstrap", existingSession, async c => {
+      const context = c.get("requestContext");
+      return jsonSuccess({ seedVersion: context.seedVersion, csrfToken: context.csrfToken, agentChannelToken: await issueChannelToken({
+        signingKey: dependencies.channelSigningKey, channel: "agent", sessionId: context.sessionId, seedVersion: context.seedVersion, now: clock.now(),
+      }) }, context, clock.now());
+    });
+    app.use("/api/v1/*", existingSession, channel);
+    const db = dependencies.db;
+    app.use("/api/v1/*", async (c, next) => {
+      const path = c.req.path;
+      const kind = c.req.method === "GET" && path === "/api/v1/orders" ? "search" : c.req.method === "POST" && path === "/api/v1/eligibility-checks" ? "eligibility" : !["GET", "HEAD", "OPTIONS"].includes(c.req.method) ? "write" : null;
+      if (kind) {
+        const sessionId = c.get("requestContext").sessionId;
+        await consumeRateLimit(db, kind, await rateLimitDigest(sessionId, c.req.header("CF-Connecting-IP") ?? "unknown"), clock.now(), sessionId);
+      }
+      await next();
+    });
+    app.route("/api/v1", apiRoutes(dependencies.db, clock, ids, csrf, dependencies.channelSigningKey));
+  }
+  app.all("/api/*", c => mapError(new DomainError("ENTITY_NOT_FOUND", 404, false), c.get("requestContext"), clock.now()));
   app.all("*", c => dependencies.assets?.fetch(c.req.raw) ?? new Response("Not Found", { status: 404 }));
   return app;
 }

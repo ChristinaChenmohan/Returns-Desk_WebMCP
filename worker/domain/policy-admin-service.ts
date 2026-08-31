@@ -13,12 +13,15 @@ import { ruleLayer } from "./policy/rule-catalog";
 import type { PolicyRule, PolicyRuleType, ReturnShippingPayer } from "./policy/types";
 import type { Clock, IdGenerator } from "./primitives";
 import { cryptoIds, systemClock } from "./primitives";
+import { commandHash } from "./command-hash";
+import { IdempotencyRepository } from "../repositories/idempotency-repository";
 
 export type HumanContext = Omit<RequestContext, "actor"> & {
   actor: { type: "human"; id: string };
 };
 
 export interface UpdatePolicyDraft {
+  idempotencyKey?: string;
   id: string;
   expectedVersion: number;
   name: string;
@@ -31,6 +34,7 @@ export interface UpdatePolicyDraft {
 }
 
 export interface ActivatePolicy {
+  idempotencyKey?: string;
   id: string;
   expectedVersion: number;
 }
@@ -91,6 +95,8 @@ export class PolicyAdminService {
 
   async updateDraft(command: UpdatePolicyDraft, context: HumanContext): Promise<PolicyVersion> {
     assertHuman(context);
+    const replay = await this.replayCommand("policy.update", command, context);
+    if (replay) return replay;
     validatePolicyHeader(command);
     const rules = validateRules(command.rules);
     const conflicts = findPolicyConflicts(rules);
@@ -153,8 +159,12 @@ export class PolicyAdminService {
         rule.active ? 1 : 0, context.sessionId, auditId, command.id,
       )),
     ];
-    const results = await this.db.batch(statements);
+    statements.push(...await this.commandRecord("policy.update", command, context, auditId));
+    let results: D1Result<unknown>[];
+    try { results = await this.db.batch(statements); }
+    catch (error) { const replay = await this.replayCommand("policy.update", command, context); if (replay) return replay; throw error; }
     if (results[0]?.meta.changes !== 1 || results[1]?.meta.changes !== 1) {
+      const replay = await this.replayCommand("policy.update", command, context); if (replay) return replay;
       await this.throwWriteConflict(command.id, command.expectedVersion, context);
     }
     return this.loadVersion(command.id, context.sessionId);
@@ -173,13 +183,14 @@ export class PolicyAdminService {
 
   async activate(command: ActivatePolicy, context: HumanContext): Promise<PolicyVersion> {
     assertHuman(context);
+    const replay = await this.replayCommand("policy.activate", command, context); if (replay) return replay;
     const validation = await this.validateDraft(command.id, context);
     if (!validation.valid) {
       throw new DomainError("POLICY_RULE_CONFLICT", 422, false, "resolve_policy_conflicts");
     }
     const auditId = this.ids.next("audit");
     const now = this.clock.now().toISOString();
-    const results = await this.db.batch([
+    const statements = [
       this.db.prepare(
         `INSERT INTO audit_events
           (id, session_id, case_id, actor_type, actor_id, event_type,
@@ -226,14 +237,19 @@ export class PolicyAdminService {
         now, context.sessionId, command.id, command.expectedVersion,
         context.sessionId, auditId, command.id,
       ),
-    ]);
+      ...await this.commandRecord("policy.activate", command, context, auditId),
+    ];
+    let results: D1Result<unknown>[];
+    try { results = await this.db.batch(statements); }
+    catch (error) { const replay = await this.replayCommand("policy.activate", command, context); if (replay) return replay; throw error; }
     if (results[0]?.meta.changes !== 1 || results[2]?.meta.changes !== 1) {
+      const replay = await this.replayCommand("policy.activate", command, context); if (replay) return replay;
       await this.throwWriteConflict(command.id, command.expectedVersion, context);
     }
     return this.loadVersion(command.id, context.sessionId);
   }
 
-  private async loadVersion(id: string, sessionId: string): Promise<PolicyVersion> {
+  async loadVersion(id: string, sessionId: string): Promise<PolicyVersion> {
     const row = await this.findRow(sessionId, id);
     const definition = await this.policies.findById(sessionId, id);
     if (row === null || definition === null) {
@@ -254,6 +270,60 @@ export class PolicyAdminService {
       version: row.version,
       rules: definition.rules,
     };
+  }
+
+  async list(input: { status?: string; cursor?: string; limit?: number }, context: RequestContext) {
+    const rows = await this.db.prepare(`SELECT id FROM policy_versions WHERE session_id = ? AND (? IS NULL OR status = ?)
+      AND (? IS NULL OR id > ?) ORDER BY id LIMIT ?`).bind(context.sessionId, input.status ?? null, input.status ?? null,
+        input.cursor ?? null, input.cursor ?? null, input.limit ?? 20).all<{ id: string }>();
+    const items = await Promise.all(rows.results.map(row => this.loadVersion(row.id, context.sessionId)));
+    return { items, nextCursor: items.length === (input.limit ?? 20) ? items.at(-1)!.id : null };
+  }
+
+  async createDraft(command: Omit<UpdatePolicyDraft, "id" | "expectedVersion"> & { idempotencyKey: string }, context: HumanContext): Promise<PolicyVersion> {
+    assertHuman(context);
+    const replay = await this.replayCommand("policy.create", command, context); if (replay) return replay;
+    const id = this.ids.next("policy"), auditId = this.ids.next("audit"), now = this.clock.now().toISOString();
+    validatePolicyHeader({ ...command, id, expectedVersion: 1 });
+    const rules = validateRules(command.rules);
+    if (findPolicyConflicts(rules).length) throw new DomainError("POLICY_RULE_CONFLICT", 422, false);
+    try {
+      const results = await this.db.batch([
+        this.db.prepare(`INSERT INTO policy_versions (id, session_id, version_number, name, effective_from, effective_to,
+          default_window_days, absolute_max_window_days, default_return_required, default_resolutions_json, return_shipping_payer, status, version)
+          SELECT ?, ?, COALESCE((SELECT MAX(version_number) FROM policy_versions WHERE session_id = ?), 0) + 1,
+          ?, ?, NULL, ?, ?, ?, ?, ?, 'draft', 1 FROM demo_sessions WHERE id = ? AND seed_version = ?`)
+          .bind(id, context.sessionId, context.sessionId, command.name, now, command.defaultWindowDays, command.absoluteMaxWindowDays,
+            command.defaultReturnRequired ? 1 : 0, JSON.stringify(command.defaultResolutions), command.returnShippingPayer, context.sessionId, context.seedVersion),
+        ...rules.map(rule => this.db.prepare(`INSERT INTO policy_rules (id, session_id, policy_version_id, rule_type, priority, conditions_json, outcome_json, explanation_template, active)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM policy_versions WHERE session_id = ? AND id = ?)`)
+          .bind(rule.id, context.sessionId, id, rule.ruleType, rule.priority, JSON.stringify(rule.conditions), JSON.stringify(rule.outcome), rule.explanation,
+            rule.active ? 1 : 0, context.sessionId, id)),
+        this.db.prepare(`INSERT INTO audit_events (id, session_id, case_id, actor_type, actor_id, event_type, entity_type, entity_id, summary, metadata_json, created_at)
+          SELECT ?, ?, NULL, 'human', ?, 'policy.created', 'policy_version', ?, 'Created a policy draft.', '{}', ?
+          WHERE EXISTS (SELECT 1 FROM policy_versions WHERE session_id = ? AND id = ?)`)
+          .bind(auditId, context.sessionId, context.actor.id, id, now, context.sessionId, id),
+        ...await this.commandRecord("policy.create", command, context, auditId),
+      ]);
+      if (results[0]?.meta.changes !== 1) throw new DomainError("DEMO_SESSION_RESET", 409, false, "reload_demo");
+    } catch (error) { const replay = await this.replayCommand("policy.create", command, context); if (replay) return replay; throw error; }
+    return this.loadVersion(id, context.sessionId);
+  }
+
+  private async replayCommand(kind: string, command: { idempotencyKey?: string }, context: HumanContext) {
+    if (command.idempotencyKey === undefined) return null;
+    const row = await new IdempotencyRepository(this.db).find(context.sessionId, kind, command.idempotencyKey);
+    if (!row) return null;
+    const { idempotencyKey: _key, ...payload } = command;
+    if (row.requestHash !== await commandHash(payload)) throw new DomainError("IDEMPOTENCY_KEY_REUSED", 409, false);
+    return this.loadVersion(row.resultEntityId, context.sessionId);
+  }
+  private async commandRecord(kind: string, command: { idempotencyKey?: string }, context: HumanContext, auditId: string) {
+    if (command.idempotencyKey === undefined) return [];
+    const { idempotencyKey, ...payload } = command;
+    return [this.db.prepare(`INSERT INTO idempotency_records (session_id, command_kind, idempotency_key, request_hash, result_entity_type, result_entity_id, created_at)
+      SELECT ?, ?, ?, ?, 'policy_version', entity_id, ? FROM audit_events WHERE session_id = ? AND id = ?`)
+      .bind(context.sessionId, kind, idempotencyKey, await commandHash(payload), this.clock.now().toISOString(), context.sessionId, auditId)];
   }
 
   private findRow(sessionId: string, id: string): Promise<PolicyAdminRow | null> {

@@ -357,7 +357,7 @@ export class ProposalService {
     return { check, option, message: parsed.data.customerMessage, command: parsed.data, factGuard };
   }
 
-  private async assertSnapshotFresh(
+  async assertSnapshotFresh(
     check: EligibilityCheckRecord,
     context: CommandContext,
     resolutionType: ResolutionType,

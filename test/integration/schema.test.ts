@@ -130,7 +130,7 @@ async function seedCase(caseId: string): Promise<void> {
       '["exchange","refund","store_credit"]',
       "merchant",
       "[]",
-      "{}",
+      '{"input":{"previouslyReturnedQuantity":0,"replacementVariant":{"inventoryQuantity":4,"inventoryVersion":1}}}',
       `hash_${caseId}`,
       "engine",
       NOW,
@@ -171,11 +171,6 @@ async function insertApprovedFixture(): Promise<void> {
   await seedCase("case_approved");
   await insertPending("prop_1", "case_approved");
   await db.prepare(
-    `UPDATE rma_proposals
-        SET status = 'approved', reviewed_at = ?, reviewed_by = ?, version = version + 1
-      WHERE id = ? AND case_id = ?`,
-  ).bind(NOW, "merchant_schema", "prop_1", "case_approved").run();
-  await db.prepare(
     `INSERT INTO rmas
       (id, session_id, rma_number, case_id, proposal_id, resolution_type,
        status, created_at, completed_at)
@@ -191,6 +186,23 @@ async function insertApprovedFixture(): Promise<void> {
     NOW,
     NOW,
   ).run();
+  await db.batch([
+    db.prepare(`INSERT INTO rma_items (id, session_id, rma_id, order_item_id, quantity, replacement_variant_id)
+      VALUES ('ri_1', 'session_case_approved', 'rma_1', 'item_case_approved', 1, 'variant_case_approved')`),
+    db.prepare(`INSERT INTO inventory_reservations
+      (id, session_id, reservation_number, rma_id, variant_id, quantity, status, created_at)
+      VALUES ('res_1', 'session_case_approved', 'RES-1', 'rma_1', 'variant_case_approved', 1, 'committed', ?)`)
+      .bind(NOW),
+    db.prepare(`UPDATE order_items SET previously_returned_quantity = 1
+      WHERE session_id = 'session_case_approved' AND id = 'item_case_approved'`),
+    db.prepare(`UPDATE product_variants SET inventory_quantity = 3, inventory_version = 2
+      WHERE session_id = 'session_case_approved' AND id = 'variant_case_approved'`),
+    db.prepare(`INSERT INTO return_labels (id, session_id, label_number, rma_id, tracking_number, created_at)
+      VALUES ('label_1', 'session_case_approved', 'LABEL-1', 'rma_1', 'TRACK-1', ?)`)
+      .bind(NOW),
+    db.prepare(`UPDATE rma_proposals SET status = 'approved', reviewed_at = ?, reviewed_by = ?, version = version + 1
+      WHERE session_id = ? AND id = ?`).bind(NOW, "merchant_schema", "session_case_approved", "prop_1"),
+  ]);
 }
 
 describe("D1 schema invariants", () => {
@@ -225,29 +237,22 @@ describe("D1 schema invariants", () => {
   });
 
   it("allows a same-terminal proposal no-op and rejects a different terminal transition", async () => {
-    await seedCase("case_terminal");
-    await insertPending("prop_terminal", "case_terminal");
-    const sessionId = "session_case_terminal";
-
-    await db.prepare(
-      `UPDATE rma_proposals
-          SET status = 'approved', reviewed_at = ?, reviewed_by = ?, version = version + 1
-        WHERE session_id = ? AND id = ?`,
-    ).bind(NOW, "merchant_schema", sessionId, "prop_terminal").run();
+    await insertApprovedFixture();
+    const sessionId = "session_case_approved";
 
     await expect(
       db.prepare(
         `UPDATE rma_proposals
             SET status = 'approved'
           WHERE session_id = ? AND id = ?`,
-      ).bind(sessionId, "prop_terminal").run(),
+      ).bind(sessionId, "prop_1").run(),
     ).resolves.toBeDefined();
     await expect(
       db.prepare(
         `UPDATE rma_proposals
             SET status = 'rejected'
           WHERE session_id = ? AND id = ?`,
-      ).bind(sessionId, "prop_terminal").run(),
+      ).bind(sessionId, "prop_1").run(),
     ).rejects.toThrow();
   });
 

@@ -1,5 +1,10 @@
 import type { RequestContext } from "../http/context";
 import { DomainError } from "./errors";
+import { ProposalService } from "./proposal-service";
+import { ProposalRepository } from "../repositories/proposal-repository";
+import { ApprovalRepository } from "../repositories/approval-repository";
+import { DemoCommerceAdapter } from "../demo/demo-commerce-adapter";
+import { systemClock, cryptoIds, type Clock, type IdGenerator } from "./primitives";
 import type {
   AllowedResolution,
   EligibilityDecision,
@@ -68,7 +73,7 @@ interface ActivityRow {
 }
 
 export class CaseQueryService {
-  constructor(private readonly db: D1Database) {}
+  constructor(private readonly db: D1Database, private readonly clock: Clock = systemClock, private readonly ids: IdGenerator = cryptoIds) {}
 
   async list(input: CaseListInput, context: RequestContext) {
     const limit = pageLimit(input.limit);
@@ -94,6 +99,10 @@ export class CaseQueryService {
   }
 
   async getWorkspace(caseId: string, context: RequestContext) {
+    const latest = await this.db.prepare("SELECT id FROM rma_proposals WHERE session_id = ? AND case_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
+      .bind(context.sessionId, caseId).first<{ id: string }>();
+    const proposal = latest === null ? null : await new ProposalService(this.db, this.clock, this.ids).read(latest.id, context);
+    const proposalRecord = latest === null ? null : await new ProposalRepository(this.db).findById(context.sessionId, latest.id);
     const row = await this.db.prepare(
       `SELECT rc.id, rc.order_id, o.order_number, c.name AS customer_name,
               rc.status, rc.reason_code, rc.condition_code, rc.opened_at,
@@ -127,6 +136,11 @@ export class CaseQueryService {
         ? null
         : toPublicEligibility(row.latest_check_id, row.calculation_snapshot_json),
       pendingProposalId: row.pending_proposal_id,
+      proposal: proposal === null ? null : { ...proposal, customerMessage: proposalRecord!.customerMessage },
+      completion: proposal?.status === "approved" ? await new ApprovalRepository(this.db).findCompleted(context.sessionId, proposal.proposalId) : null,
+      order: await new DemoCommerceAdapter(this.db).getOrder(context.sessionId, row.order_id),
+      customerNote: (await this.db.prepare("SELECT customer_note FROM return_cases WHERE session_id = ? AND id = ?")
+        .bind(context.sessionId, caseId).first<{ customer_note: string | null }>())?.customer_note ?? null,
     };
   }
 
