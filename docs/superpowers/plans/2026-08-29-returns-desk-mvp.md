@@ -1235,7 +1235,7 @@ Expected: all automated suites pass; no forbidden tool is discoverable.
 
 The script must verify health, bootstrap cookie flags, CSP, six-tool headed registration, missing human tools, Session isolation, one refund flow, Reset scope, and SPA fallback. It exits nonzero on any mismatch.
 
-- [ ] **Step 2: Provision production D1, then add CI and deployment configuration**
+- [x] **Step 2: Provision production D1, then add CI and deployment configuration**
 
 Run `npx wrangler d1 create returns-desk` once. Copy the returned immutable database ID into `env.production.d1_databases[0].database_id` in `wrangler.jsonc`, with binding `DB` and database name `returns-desk`; do not change the local binding. CI runs `npm ci`, `npm run check`, migrations against an empty local D1, security tests, Playwright, and artifact upload for test reports. Deployment docs use `wrangler d1 migrations apply returns-desk --remote --env production` before `npm run deploy -- --env production`; secrets are configured through Wrangler secrets, never committed vars.
 
@@ -1258,7 +1258,7 @@ node scripts/deployment-smoke.mjs "$env:RETURNS_DESK_BASE_URL"
 node scripts/verify-security-headers.mjs "$env:RETURNS_DESK_BASE_URL"
 ```
 
-Before running the last two commands, set `RETURNS_DESK_BASE_URL` to the exact URL printed by `wrangler deploy`. Expected: all local and deployed checks exit 0; both scripts reject an empty, non-HTTPS, or non-Returns-Desk URL.
+Before deployment, `npm run deploy` must build with `CLOUDFLARE_ENV=production` so the Cloudflare Vite plugin flattens `env.production` into its redirected deploy config. Before running the last two commands, set `RETURNS_DESK_BASE_URL` to the exact URL printed by Wrangler. Expected: all local and deployed checks exit 0; both scripts reject an empty, non-HTTPS, or non-Returns-Desk URL.
 
 - [ ] **Step 5: Perform the two-browser manual release gate and commit**
 

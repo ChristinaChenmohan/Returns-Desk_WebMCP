@@ -16,7 +16,7 @@
     "test:agent-eval": "node scripts/run-agent-eval.mjs test/eval/traces/ci.jsonl",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check.mjs",
-    "deploy": "wrangler deploy"
+    "deploy": "node scripts/deploy-production.mjs"
   },
   "keywords": [],
   "author": "",

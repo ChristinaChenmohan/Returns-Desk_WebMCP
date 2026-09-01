@@ -5,6 +5,16 @@
   "compatibility_date": "2026-08-29",
   "vars": { "APP_ENV": "development" },
   "d1_databases": [{ "binding": "DB", "database_name": "returns-desk", "database_id": "local" }],
+  "env": {
+    "production": {
+      "vars": { "APP_ENV": "production" },
+      "d1_databases": [{
+        "binding": "DB",
+        "database_name": "returns-desk",
+        "database_id": "e930a31a-6096-4be0-bb42-cec21cb831d3"
+      }]
+    }
+  },
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist/client",

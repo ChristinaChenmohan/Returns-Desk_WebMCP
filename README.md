@@ -48,7 +48,7 @@ The app feature-detects `document.modelContext?.registerTool`. Browsers without 
 
 ## Deployment
 
-Production deployment requires an authenticated Cloudflare account, a provisioned D1 database ID, and a Wrangler secret named `CHANNEL_SIGNING_KEY`. Follow [docs/deployment.md](docs/deployment.md). Never commit secrets or invent a D1 ID.
+Production deployment requires an authenticated Cloudflare account, a provisioned D1 database ID, and a Wrangler secret named `CHANNEL_SIGNING_KEY`. `npm run deploy` builds with `CLOUDFLARE_ENV=production` before invoking Wrangler. Follow [docs/deployment.md](docs/deployment.md). Never commit secrets or invent a D1 ID.
 
 ## License
 
