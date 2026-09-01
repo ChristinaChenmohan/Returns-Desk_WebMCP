@@ -3,7 +3,7 @@ CREATE TRIGGER guard_proposal_approval
 BEFORE UPDATE OF status ON rma_proposals
 WHEN NEW.status = 'approved'
 BEGIN
-  SELECT CASE WHEN NOT EXISTS (
+  SELECT RAISE(ABORT, 'APPROVAL_ARTIFACT_MISSING') WHERE NOT EXISTS (
     SELECT 1 FROM rmas r
     JOIN rma_items ri ON ri.session_id = r.session_id AND ri.rma_id = r.id
     JOIN order_items oi ON oi.session_id = ri.session_id AND oi.id = ri.order_item_id
@@ -48,7 +48,7 @@ BEGIN
           AND NOT EXISTS (SELECT 1 FROM simulated_refunds f WHERE f.session_id = r.session_id AND f.rma_id = r.id)
           AND NOT EXISTS (SELECT 1 FROM store_credits s WHERE s.session_id = r.session_id AND s.rma_id = r.id))
       )
-  ) THEN RAISE(ABORT, 'APPROVAL_ARTIFACT_MISSING') END;
+  );
 END;
 
 CREATE TRIGGER guard_proposal_approved_insert
