@@ -42,6 +42,15 @@ npm run test:agent-eval
 
 `npm run check` runs strict TypeScript, 199 Worker/unit/integration/contract/security tests, 8 UI tests, and the production build. Playwright covers the nine fixed-seed browser flows. The WebMCP smoke uses Chromium with a compatibility ModelContext to verify six registrations, annotations, execution, `toolchange`, and abort cleanup. Native target-Chrome and ChatGPT in-app acceptance remains a manual release gate.
 
+A no-paid-API live agent lane uses Chrome Canary, WebMCP Evals, and local Ollama:
+
+```bash
+ollama pull qwen3:4b-instruct
+npm run test:webmcp:ollama -- https://returns-desk-production.chenmohan2006.workers.dev
+```
+
+See [docs/ollama-webmcp-evals.md](docs/ollama-webmcp-evals.md) for prerequisites, report locations, model overrides, and the `webmcp-evals@0.0.4` compatibility note.
+
 ## WebMCP compatibility
 
 The app feature-detects `document.modelContext?.registerTool`. Browsers without the API receive the complete human UI. A target browser build or origin-trial/flag configuration may be required while WebMCP remains experimental. Callback `AbortSignal` is forwarded best-effort; correctness relies on server idempotency, conditional writes, constraints, and D1 atomic batches.

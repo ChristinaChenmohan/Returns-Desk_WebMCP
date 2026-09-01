@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:webmcp": "node scripts/webmcp-headed-smoke.mjs",
+    "test:webmcp:ollama": "node scripts/run-webmcp-ollama-eval.mjs",
     "test:agent-eval": "node scripts/run-agent-eval.mjs test/eval/traces/ci.jsonl",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check.mjs",
@@ -48,6 +49,7 @@
     "typescript-eslint": "^8.68.0",
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
+    "webmcp-evals": "^0.0.4",
     "wrangler": "^4.127.1"
   },
   "private": true

@@ -1,0 +1,21 @@
+[
+  {
+    "name": "Chrome Canary agent searches for a known order",
+    "messages": [
+      {
+        "role": "user",
+        "type": "message",
+        "content": "Use the WebMCP tools registered by this page to search for order ORD-1001 with limit 5. Make exactly one tool call and do not guess the result."
+      }
+    ],
+    "expectedCall": [
+      {
+        "functionName": "search_orders",
+        "arguments": {
+          "query": "ORD-1001",
+          "limit": 5
+        }
+      }
+    ]
+  }
+]
