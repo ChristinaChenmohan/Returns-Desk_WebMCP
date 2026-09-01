@@ -12,6 +12,13 @@ test("two tabs cannot execute the same pending proposal twice", async ({ page, c
   const f = await apiProposal(page.request), second = await context.newPage();
   const other = await api(second.request, f.cookie); const body = { expectedVersion: 1, confirmation: "approve_and_simulate_completion" };
   const responses = await Promise.all([f.call(`/rma-proposals/${f.proposal.proposalId}/approve`, "POST", body), other.call(`/rma-proposals/${f.proposal.proposalId}/approve`, "POST", body)]);
-  expect(responses.map(r => r.response.status()).sort()).toEqual([200, 409]);
+  expect(responses.map(r => r.response.status())).toEqual([200, 200]);
+  expect(responses[0].data).toMatchObject({ proposal: { status: "approved" }, rma: { status: "completed" } });
+  expect(responses[1].data).toEqual(responses[0].data);
+  const workspace = await f.call<{ completion: { rma: { id: string; status: string } } | null }>(`/cases/${f.check.caseId}`);
+  expect(workspace.data.completion?.rma).toMatchObject({
+    id: (responses[0].data as { rma: { id: string } }).rma.id,
+    status: "completed",
+  });
 });
 

@@ -921,7 +921,7 @@ Expected: documented valid/error fixtures match exact response schemas.
 - Consumes: `/api/v1` browser client.
 - Produces: five accessible routes, versioned Case query keys, standard idle/loading/ready/empty/error/stale regions, and explicit human action entry points.
 
-- [ ] **Step 1: Write failing navigation and Case state tests**
+- [x] **Step 1: Write failing navigation and Case state tests**
 
 Assert global links, keyboard navigation, multiple-order selection, needs_review hides submit, non-pending hides approve, untrusted text never renders as HTML, and stale version disables commands.
 
@@ -931,13 +931,13 @@ expect(screen.getByText(/<img/)).toBeVisible();
 expect(document.querySelector("img")).toBeNull();
 ```
 
-- [ ] **Step 2: Run UI tests red**
+- [x] **Step 2: Run UI tests red**
 
 Run: `npx vitest run --environment jsdom test/ui/navigation.test.tsx test/ui/case-page.test.tsx`
 
 Expected: FAIL because pages/components do not exist.
 
-- [ ] **Step 3: Implement app shell, router, HTTP client, and async regions**
+- [x] **Step 3: Implement app shell, router, HTTP client, and async regions**
 
 Use React Router paths `/`, `/orders`, `/cases/:caseId`, `/approvals`, `/policies`. The UI HTTP client decodes `ErrorEnvelope` into `ApiError`, keeps the bootstrap-issued human channel token in a provider closure, and always uses `credentials: "same-origin"`. TanStack Query keys include entity ID but not Session cookie or channel token.
 
@@ -953,7 +953,7 @@ export async function apiRequest<T>(path: string, init: RequestInit, auth: UiAut
 }
 ```
 
-- [ ] **Step 4: Implement Case Workspace and read-only pages**
+- [x] **Step 4: Implement Case Workspace and read-only pages**
 
 Render the five Case regions from the page spec, pure-text rule evidence, Activity timeline, Demo badges, version, and recovery actions. Use focus-managed dialogs and live regions. No component calculates policy, money, or status transitions.
 
@@ -965,7 +965,7 @@ export function CasePage() {
 }
 ```
 
-- [ ] **Step 5: Run UI/accessibility checks and commit**
+- [x] **Step 5: Run UI/accessibility checks and commit**
 
 Run:
 
@@ -997,17 +997,17 @@ git commit -m "feat: build returns desk workspace"
 - Consumes: human-only HTTP routes, `expectedVersion`, `expectedSeedVersion`.
 - Produces: explicit confirmation workflows with idempotency keys and cache invalidation.
 
-- [ ] **Step 1: Write failing confirmation tests**
+- [x] **Step 1: Write failing confirmation tests**
 
 Assert exact confirmation phrases, structured reason requirements, replacement diff, approval side-effect summary, no bulk approval, Reset second confirmation, focus return, and stale 409 recovery.
 
-- [ ] **Step 2: Run human action tests red**
+- [x] **Step 2: Run human action tests red**
 
 Run: `npx vitest run --environment jsdom test/ui/human-actions.test.tsx test/ui/policy-editor.test.tsx`
 
 Expected: FAIL because dialogs are missing.
 
-- [ ] **Step 3: Implement human-only mutations**
+- [x] **Step 3: Implement human-only mutations**
 
 Generate one idempotency key when each dialog opens and reuse it across network retries. Send the exact confirmation enum from the contract. On 409, preserve form input, close unsafe submit state, refresh the Case, and show the structured recovery action.
 
@@ -1021,7 +1021,7 @@ const approve = useMutation({
 });
 ```
 
-- [ ] **Step 4: Implement draft-only policy editing and Reset**
+- [x] **Step 4: Implement draft-only policy editing and Reset**
 
 Policy editor permits only catalog rules and draft versions, shows validation/conflict results before activation, and never mutates active/retired versions. Reset clears the query client and navigates to `/` only after the server returns the new seedVersion/CSRF.
 
@@ -1031,7 +1031,7 @@ const validation = await policies.validate(policy.id);
 if (!validation.valid) return setValidation(validation);
 ```
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run:
 
@@ -1060,7 +1060,7 @@ git commit -m "feat: add explicit human controls"
 - Consumes: shared tool schemas, browser HTTP client, TanStack Query client.
 - Produces: `registerReturnsDeskTools(deps): () => void`, exact annotations, best-effort signal forwarding, and `syncEffects(effects): Promise<UiSync>`.
 
-- [ ] **Step 1: Write failing registry and sync tests**
+- [x] **Step 1: Write failing registry and sync tests**
 
 Use a fake `ModelContext` that records definitions/controllers. Assert exactly six names, no human names, annotation matrix, strict schemas, cleanup abort, duplicate-mount safety, API-result compression, and re-fetch until `case.version >= entityVersion`.
 
@@ -1072,13 +1072,13 @@ expect(definitions.map(x => [x.name, x.annotations.readOnlyHint])).toEqual([
 ]);
 ```
 
-- [ ] **Step 2: Run WebMCP contracts red**
+- [x] **Step 2: Run WebMCP contracts red**
 
 Run: `npx vitest run test/contract/webmcp-registry.test.ts test/contract/webmcp-sync.test.ts`
 
 Expected: FAIL because registry modules are absent.
 
-- [ ] **Step 3: Implement static definitions and lifecycle**
+- [x] **Step 3: Implement static definitions and lifecycle**
 
 Feature-detect `document.modelContext?.registerTool`. Create one registration controller per mount. Await or collect registration Promises; log safe compatibility diagnostics without breaking UI. Cleanup aborts the same controller. Do not use `navigator.modelContext`, `provideContext`, `clearContext`, or name-based unregister.
 
@@ -1094,7 +1094,7 @@ export function registerReturnsDeskTools(deps: RegistryDeps): () => void {
 }
 ```
 
-- [ ] **Step 4: Implement execution and version synchronization**
+- [x] **Step 4: Implement execution and version synchronization**
 
 Each execute validates input, promotes `idempotencyKey` to the header for writes, uses only the bootstrap-issued agent channel token, injects current seedVersion/CSRF via the HTTP client, forwards `options.signal`, then invalidates/refetches effects. If refresh fails after HTTP success, return business success with `uiSync: "refresh_required"`; never re-run the write merely to refresh UI.
 
@@ -1144,17 +1144,17 @@ Expected: unit contracts pass; headed Chrome discovers six tools, annotations, c
 - Consumes: deployed/local Worker, seed fixtures, six WebMCP tools.
 - Produces: automated evidence for every security and Demo acceptance criterion.
 
-- [ ] **Step 1: Write failing high-risk security tests**
+- [x] **Step 1: Write failing high-risk security tests**
 
 Test Session A IDs from Session B, missing/wrong CSRF, forged human actor, customer-note HTML/Markdown/system prompts, unknown fields, Unicode/long search, rate limiting, and log redaction. Assert identical 404 for missing and cross-Session IDs.
 
-- [ ] **Step 2: Run security suites and verify the missing controls fail**
+- [x] **Step 2: Run security suites and verify the missing controls fail**
 
 Run: `npx vitest run test/security`
 
 Expected: FAIL because rate-limit buckets and the safe structured logger do not exist.
 
-- [ ] **Step 3: Implement the demonstrated security controls**
+- [x] **Step 3: Implement the demonstrated security controls**
 
 Create `rate-limit.ts` with separate `search`, `eligibility`, and `write` buckets keyed by a one-way hash of Session ID plus coarse IP prefix; return `RATE_LIMITED`, `retryable: true`, and a bounded retry time. Create `safe-logger.ts` with an allowlist of `requestId`, `correlationId`, route template, status, duration, error code, and entity type; reject/log-test any Cookie, CSRF, email, note, prompt, or stack field.
 
@@ -1168,7 +1168,7 @@ export async function consumeRateLimit(db: D1Database, kind: RateLimitKind, dige
 const LOG_FIELDS = new Set(["requestId", "correlationId", "route", "status", "durationMs", "errorCode", "entityType"]);
 ```
 
-- [ ] **Step 4: Implement fixed-seed Playwright flows**
+- [x] **Step 4: Implement fixed-seed Playwright flows**
 
 Each test resets its own Session and asserts API-visible final facts, not only Toast text. Cover refund, exchange committed reservation, credit consent, needs_review child snapshot, reject/replace/expire/invalidate, two-tab approval, retry with same idempotency key, Reset isolation, keyboard/focus/live-region basics.
 
@@ -1181,7 +1181,7 @@ test("exchange commits exactly one inventory reservation", async ({ page, reques
 });
 ```
 
-- [ ] **Step 5: Implement the ten-case Agent eval runner**
+- [x] **Step 5: Implement the ten-case Agent eval runner**
 
 Store each case as `{ id, prompt, expectedTools, allowedAlternatives, forbiddenTools, finalAssertions }`. The scorer consumes exported JSONL invocation traces; CI uses deterministic traces produced by the contract harness, while headed Chrome/ChatGPT runs export real traces for the same scorer. It fails any discovery of a human capability, unsafe response to prompt injection, first-result auto-selection, missing-information guess, or proposal submission from needs_review. The application still contains no LLM dependency.
 
@@ -1196,7 +1196,7 @@ for (const evaluation of cases) {
 
 `export-agent-trace.mjs` reads only safe Activity events and final Case facts for a specified seeded eval Case; it never exports customer notes, full messages, prompts, cookies, or tokens.
 
-- [ ] **Step 6: Run the full quality gate and commit**
+- [x] **Step 6: Run the full quality gate and commit**
 
 Run:
 
@@ -1231,7 +1231,7 @@ Expected: all automated suites pass; no forbidden tool is discoverable.
 - Consumes: all build/test/deploy commands.
 - Produces: reproducible CI, production D1/deployment steps, security/WebMCP smoke evidence, and submission-ready documentation.
 
-- [ ] **Step 1: Add a failing deployment smoke against local preview**
+- [x] **Step 1: Add a failing deployment smoke against local preview**
 
 The script must verify health, bootstrap cookie flags, CSP, six-tool headed registration, missing human tools, Session isolation, one refund flow, Reset scope, and SPA fallback. It exits nonzero on any mismatch.
 
@@ -1239,7 +1239,7 @@ The script must verify health, bootstrap cookie flags, CSP, six-tool headed regi
 
 Run `npx wrangler d1 create returns-desk` once. Copy the returned immutable database ID into `env.production.d1_databases[0].database_id` in `wrangler.jsonc`, with binding `DB` and database name `returns-desk`; do not change the local binding. CI runs `npm ci`, `npm run check`, migrations against an empty local D1, security tests, Playwright, and artifact upload for test reports. Deployment docs use `wrangler d1 migrations apply returns-desk --remote --env production` before `npm run deploy -- --env production`; secrets are configured through Wrangler secrets, never committed vars.
 
-- [ ] **Step 3: Write exact operational and submission docs**
+- [x] **Step 3: Write exact operational and submission docs**
 
 README includes architecture, local setup, migration/seed/reset commands, Demo-only disclaimer, WebMCP headed flag/origin-trial requirements, test commands, the MIT license, and known callback-signal compatibility behavior. `LICENSE` uses the standard MIT text with `Copyright (c) 2026 Returns Desk contributors`. `docs/demo-script.md` follows the approved 0:00–3:00 timeline. Devpost/video docs use only verified capabilities.
 

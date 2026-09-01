@@ -12,6 +12,8 @@
     "build": "tsc --noEmit && vite build",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:webmcp": "node scripts/webmcp-headed-smoke.mjs",
+    "test:agent-eval": "node scripts/run-agent-eval.mjs test/eval/traces/ci.jsonl",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check.mjs",
     "deploy": "wrangler deploy"

@@ -19,7 +19,10 @@ export async function startUiCase(page: Page, resolution: "refund" | "exchange" 
   await page.getByRole("combobox", { name: "Order item", exact: true }).selectOption({ index: 1 });
   if (resolution === "exchange") await page.getByRole("combobox", { name: "Optional exchange variant" }).selectOption({ index: 1 });
   if (resolution === "store_credit") await page.getByLabel("Customer explicitly agrees to store credit as an option").check();
-  if (order === "ORD-1002") await page.getByRole("combobox", { name: "Return reason" }).selectOption("damaged");
+  if (order === "ORD-1002") {
+    await page.getByRole("combobox", { name: "Return reason" }).selectOption("damaged");
+    await page.getByRole("combobox", { name: "Item condition" }).selectOption("damaged");
+  }
   await page.getByRole("button", { name: "Check return eligibility", exact: true }).click();
   await expect(page).toHaveURL(/\/cases\//); return page.url().split("/").at(-1)!;
 }

@@ -38,9 +38,11 @@ export function buildSeedStatements(
   const recentOrderedAt = daysBefore(now, 16);
   const recentFulfilledAt = daysBefore(now, 14);
   const recentDeliveredAt = daysBefore(now, 10);
-  const oldOrderedAt = daysBefore(now, 50);
-  const oldFulfilledAt = daysBefore(now, 48);
-  const oldDeliveredAt = daysBefore(now, 45);
+  // Keep the final-sale exception fixture inside the return window so its
+  // damaged condition reaches the explicit human-review rule.
+  const oldOrderedAt = daysBefore(now, 9);
+  const oldFulfilledAt = daysBefore(now, 8);
+  const oldDeliveredAt = daysBefore(now, 7);
 
   return [
     prepareInsert(
@@ -63,7 +65,7 @@ export function buildSeedStatements(
       db,
       "products",
       ["id", "session_id", "title", "category", "final_sale", "returnable_condition"],
-      [demoIds.mug, sessionId, "Limited Studio Mug", "home", 1, "unopened"],
+      [demoIds.mug, sessionId, "Limited Studio Mug", "home", 1, "damaged"],
       sessionId,
       guard,
     ),
