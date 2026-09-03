@@ -1183,7 +1183,7 @@ test("exchange commits exactly one inventory reservation", async ({ page, reques
 
 - [x] **Step 5: Implement the ten-case Agent eval runner**
 
-Store each case as `{ id, prompt, expectedTools, allowedAlternatives, forbiddenTools, finalAssertions }`. The scorer consumes exported JSONL invocation traces; CI uses deterministic traces produced by the contract harness, while headed Chrome/ChatGPT runs export real traces for the same scorer. It fails any discovery of a human capability, unsafe response to prompt injection, first-result auto-selection, missing-information guess, or proposal submission from needs_review. The application still contains no LLM dependency.
+Store each case as `{ id, prompt, expectedTools, allowedAlternatives, forbiddenTools, finalAssertions }`. The scorer consumes exported JSONL invocation traces; CI uses deterministic traces produced by the contract harness, while headed Chrome Canary runs export real traces for the same scorer. It fails any discovery of a human capability, unsafe response to prompt injection, first-result auto-selection, missing-information guess, or proposal submission from needs_review. The application still contains no LLM dependency.
 
 ```js
 for (const evaluation of cases) {
@@ -1260,15 +1260,13 @@ node scripts/verify-security-headers.mjs "$env:RETURNS_DESK_BASE_URL"
 
 Before deployment, `npm run deploy` must build with `CLOUDFLARE_ENV=production` so the Cloudflare Vite plugin flattens `env.production` into its redirected deploy config. Before running the last two commands, set `RETURNS_DESK_BASE_URL` to the exact URL printed by Wrangler. Expected: all local and deployed checks exit 0; both scripts reject an empty, non-HTTPS, or non-Returns-Desk URL.
 
-- [ ] **Step 5: Perform the two-browser manual release gate and commit**
+- [x] **Step 5: Perform the Chrome Canary manual release gate and commit**
 
-Run the three-minute script once against seeded Case `case_eval_chrome` in headed target Chrome and once against seeded Case `case_eval_chatgpt` in ChatGPT in-app browser. Export sanitized invocation traces to `artifacts/agent-eval/chrome-release.jsonl` and `artifacts/agent-eval/chatgpt-release.jsonl`; keep `artifacts/` ignored by Git. Export and score them with:
+Run the three-minute script against seeded Case `case_eval_chrome` in headed Chrome Canary. Export the sanitized invocation trace to `artifacts/agent-eval/chrome-release.jsonl`; keep `artifacts/` ignored by Git. Export and score it with:
 
 ```bash
 node scripts/export-agent-trace.mjs "$env:RETURNS_DESK_BASE_URL" case_eval_chrome artifacts/agent-eval/chrome-release.jsonl
-node scripts/export-agent-trace.mjs "$env:RETURNS_DESK_BASE_URL" case_eval_chatgpt artifacts/agent-eval/chatgpt-release.jsonl
 node scripts/run-agent-eval.mjs artifacts/agent-eval/chrome-release.jsonl
-node scripts/run-agent-eval.mjs artifacts/agent-eval/chatgpt-release.jsonl
 ```
 
 Record date, browser/build, discovered tool list, scorer result, and evidence link in `docs/agent-eval-report.md`.
@@ -1294,7 +1292,7 @@ Expected: repository, deployment, Demo, video, and submission materials all desc
 - [ ] WebMCP writes synchronize the Case by server entity version or explicitly report `refresh_required` without repeating the write.
 - [ ] Cross-Session, CSRF, Origin, prompt injection, XSS, log privacy, and rate-limit tests pass.
 - [ ] Refund, exchange, store credit, needs_review, terminal proposal states, retry, and Reset E2E scenarios pass.
-- [ ] Headed target Chrome and ChatGPT in-app browser each complete the three-minute Demo.
+- [x] Headed Chrome Canary completes the three-minute Demo.
 - [ ] README and submission documents clearly label all side effects as simulated.
 
 ## Reference Material

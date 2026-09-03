@@ -1,11 +1,11 @@
 [
   {
-    "name": "Chrome Canary agent searches for a known order",
+    "name": "Visible Ollama agent prepares an ORD-1001 refund proposal",
     "messages": [
       {
         "role": "user",
         "type": "message",
-        "content": "Use the WebMCP tools registered by this page to search for order ORD-1001 with limit 5. Make exactly one tool call and do not guess the result."
+        "content": "使用当前页面注册的 WebMCP 工具完成退货流程。每一轮只调用一个工具，并把上一轮真实返回的 ID 用于下一轮：先用 search_orders 查询 ORD-1001，limit 5；该查询应唯一匹配，并在 selectedOrder.items 中提供商品 ID。选择第一件可退商品，读取其锁定退货政策。按数量 1、原因 wrong_size、商品状态 opened_unused、客户明确同意将 store credit 作为选项来检查资格，幂等键使用 demo-eligibility-ord1001。比较 customer_value 方案，但最终选择 refund。用 warm、en-US 起草未发送的客户消息，把草稿的 subject 和 bodyText 原样提交人工审批，幂等键使用 demo-proposal-ord1001。方案达到 pending 后停止，绝对不要执行最终批准。"
       }
     ],
     "expectedCall": [
@@ -14,6 +14,56 @@
         "arguments": {
           "query": "ORD-1001",
           "limit": 5
+        }
+      },
+      {
+        "functionName": "get_return_policy",
+        "arguments": {
+          "orderId": { "$pattern": "^order_" },
+          "orderItemId": { "$pattern": "^order_item_" }
+        }
+      },
+      {
+        "functionName": "check_return_eligibility",
+        "arguments": {
+          "orderId": { "$pattern": "^order_" },
+          "orderItemId": { "$pattern": "^order_item_" },
+          "requestedQuantity": 1,
+          "reasonCode": "wrong_size",
+          "conditionCode": "opened_unused",
+          "storeCreditConsent": true,
+          "idempotencyKey": "demo-eligibility-ord1001"
+        }
+      },
+      {
+        "functionName": "compare_resolution_options",
+        "arguments": {
+          "eligibilityCheckId": { "$pattern": "^eligibility_check_" },
+          "preference": "customer_value"
+        }
+      },
+      {
+        "functionName": "draft_customer_message",
+        "arguments": {
+          "caseId": { "$pattern": "^case_" },
+          "eligibilityCheckId": { "$pattern": "^eligibility_check_" },
+          "resolutionType": "refund",
+          "tone": "warm",
+          "locale": "en-US"
+        }
+      },
+      {
+        "functionName": "submit_rma_for_approval",
+        "arguments": {
+          "caseId": { "$pattern": "^case_" },
+          "eligibilityCheckId": { "$pattern": "^eligibility_check_" },
+          "resolutionType": "refund",
+          "customerMessage": {
+            "subject": { "$type": "string" },
+            "bodyText": { "$type": "string" },
+            "locale": "en-US"
+          },
+          "idempotencyKey": "demo-proposal-ord1001"
         }
       }
     ]

@@ -53,7 +53,8 @@ it("denies every human-only mutation to the actual agent channel", async () => {
   ]) {
     expect((await f.request(route!, method!, {}, "forbidden", agent.agentChannelToken)).status, route).toBe(403);
   }
-  expect((await f.request("/orders?query=ORD", "GET", undefined, "read", agent.agentChannelToken)).status).toBe(200);
+  const search = await json<OrderSearchResult>(await f.request("/orders?query=ORD-1001", "GET", undefined, "read", agent.agentChannelToken));
+  expect((await f.request(`/orders/${search.orders[0]!.orderId}`, "GET", undefined, "read", agent.agentChannelToken)).status).toBe(200);
 });
 
 it("creates, edits, validates and activates an idempotent policy draft", async () => {

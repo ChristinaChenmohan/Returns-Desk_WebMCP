@@ -22,7 +22,20 @@ If the Ollama application is not already running:
 ollama serve
 ```
 
-## Run the live evaluation
+## Record the visible agent demo
+
+Start Ollama, then run:
+
+```powershell
+ollama serve
+npm run demo:webmcp:ollama -- https://returns-desk-production.chenmohan2006.workers.dev
+```
+
+The runner opens a visible Chrome Canary window at 1500×940, shows an injected `LOCAL OLLAMA · WEBMCP AGENT` trace card, and pauses between calls so the six-step workflow can be recorded. It searches `ORD-1001`, reads the locked policy, checks eligibility, compares resolutions, drafts an unsent message, and submits a `pending` refund proposal. The final page is the Approval Queue and remains open for 20 seconds.
+
+Set `WEBMCP_STEP_DELAY_MS` to control the delay between calls. Use `--hold-open=N` when invoking the Node script directly to change the final hold duration.
+
+## Run the headless live evaluation
 
 ```powershell
 npm ci
@@ -31,7 +44,7 @@ npm run test:webmcp:ollama -- https://returns-desk-production.chenmohan2006.work
 
 Alternatively, set `RETURNS_DESK_BASE_URL` and omit the URL argument. Override the local model with `OLLAMA_MODEL` when needed.
 
-The command launches headless Chrome Canary, waits for the page to register WebMCP tools, sends the registered schemas and the test prompt to local Ollama, executes the model-selected browser tool through Puppeteer, and checks the call with the WebMCP Evals matcher. Timestamped JSON and HTML reports are written to `artifacts/agent-eval/ollama/`; that directory is intentionally ignored by Git because reports contain per-session demo identifiers.
+The command launches headless Chrome Canary, waits for the page to register WebMCP tools, sends the registered schemas and the natural-language workflow prompt to local Ollama, feeds each real tool result back into the next model turn, and checks all six calls with the WebMCP Evals matcher. Timestamped JSON and HTML reports are written to `artifacts/agent-eval/ollama/`; that directory is intentionally ignored by Git because reports contain per-session demo identifiers.
 
 ## Compatibility note
 
@@ -39,7 +52,7 @@ The command launches headless Chrome Canary, waits for the page to register WebM
 
 ## Verified result
 
-On 2026-09-01, Chrome Canary 154.0.8035.0 and Ollama 0.33.2 with `qwen3:4b-instruct` passed 1/1 against the production URL. The local model selected exactly:
+On 2026-09-01, Chrome Canary 154.0.8035.0 and Ollama 0.33.2 with `qwen3:4b-instruct` passed the original single-call search acceptance against the production URL. On 2026-09-03, the expanded headed runner passed all 6/6 expected calls against a local HTTPS Wrangler build. Every call reported `uiSync: "synchronized"`; the final proposal reached `pending` and the browser stopped on the Approval Queue without executing approval.
 
 ```json
 {

@@ -14,6 +14,7 @@
     "test:e2e": "playwright test",
     "test:webmcp": "node scripts/webmcp-headed-smoke.mjs",
     "test:webmcp:ollama": "node scripts/run-webmcp-ollama-eval.mjs",
+    "demo:webmcp:ollama": "node scripts/run-webmcp-ollama-eval.mjs --headed --hold-open=20",
     "test:agent-eval": "node scripts/run-agent-eval.mjs test/eval/traces/ci.jsonl",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check.mjs",
@@ -21,7 +22,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",

@@ -30,7 +30,12 @@ export function registerReturnsDeskTools(deps: RegistryDeps, context: ModelConte
       if (!input.success) return JSON.stringify({ error: { code: "INVALID_REQUEST", retryable: false, recoveryAction: "correct_input" } });
       const command = route(definition.name, input.data as Record<string, unknown>);
       try {
-        const result = await deps.agentClient.call<unknown>(command.path, command.method, command.body, command.key, options?.signal);
+        let result = await deps.agentClient.call<unknown>(command.path, command.method, command.body, command.key, options?.signal);
+        if (definition.name === "search_orders" && isUniqueSearchResult(result.data)) {
+          const orderId = result.data.orders[0]!.orderId;
+          const details = await deps.agentClient.call<unknown>(`/orders/${encodeURIComponent(orderId)}`, "GET", undefined, undefined, options?.signal);
+          result = { ...result, data: { ...result.data, selectedOrder: details.data } };
+        }
         const uiSync = await deps.sync(result.effects ?? []).catch(() => "refresh_required" as const);
         return JSON.stringify({ data: result.data, uiSync });
       } catch (error) {
@@ -44,6 +49,13 @@ export function registerReturnsDeskTools(deps: RegistryDeps, context: ModelConte
     if (!state.controller.signal.aborted) return context.registerTool(tool, { signal: state.controller.signal });
   }))).catch(() => { state.controller.abort(); deps.diagnostics("registration_failed"); });
   return release(context, state);
+}
+function isUniqueSearchResult(value: unknown): value is { resultCount: 1; requiresSelection: false; orders: [{ orderId: string }] } {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as { resultCount?: unknown; requiresSelection?: unknown; orders?: unknown };
+  if (result.resultCount !== 1 || result.requiresSelection !== false || !Array.isArray(result.orders) || result.orders.length !== 1) return false;
+  const order = result.orders[0];
+  return typeof order === "object" && order !== null && typeof (order as { orderId?: unknown }).orderId === "string";
 }
 function release(context: ModelContext, state: { users: number; controller: AbortController }) {
   let released = false;

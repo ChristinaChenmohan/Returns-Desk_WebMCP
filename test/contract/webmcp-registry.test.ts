@@ -25,6 +25,45 @@ it("validates input, moves the idempotency key to headers, forwards cancellation
   expect(result).toEqual({ data: { status: "pending" }, uiSync: "refresh_required" });
   expect(f.call).toHaveBeenCalledTimes(1); expect(f.call).toHaveBeenCalledWith("/eligibility-checks", "POST", expect.not.objectContaining({ idempotencyKey: expect.anything() }), "retry-1", controller.signal); dispose();
 });
+it("enriches a unique search match with order item details for dependent tools", async () => {
+  const f = fixture();
+  f.call
+    .mockResolvedValueOnce({
+      data: {
+        orders: [{ orderId: "order-1", orderNumber: "ORD-1001" }],
+        resultCount: 1,
+        requiresSelection: false,
+      },
+      effects: [],
+      meta: {},
+    })
+    .mockResolvedValueOnce({
+      data: {
+        orderId: "order-1",
+        orderNumber: "ORD-1001",
+        items: [{ orderItemId: "item-1", productTitle: "Everyday Runner" }],
+      },
+      effects: [],
+      meta: {},
+    });
+  const dispose = registerReturnsDeskTools(f.deps, f.context); await Promise.resolve();
+
+  const result = JSON.parse(await f.definitions[0]!.execute({ query: "ORD-1001", limit: 5 }));
+
+  expect(result).toMatchObject({
+    data: {
+      resultCount: 1,
+      selectedOrder: {
+        orderId: "order-1",
+        items: [{ orderItemId: "item-1" }],
+      },
+    },
+    uiSync: "synchronized",
+  });
+  expect(f.call).toHaveBeenNthCalledWith(1, "/orders?query=ORD-1001&limit=5", "GET", undefined, undefined, undefined);
+  expect(f.call).toHaveBeenNthCalledWith(2, "/orders/order-1", "GET", undefined, undefined, undefined);
+  dispose();
+});
 it("contains registration compatibility failures without throwing or partial tool exposure", async () => {
   const f = fixture(); f.context.registerTool = () => { throw new Error("unsupported"); };
   const dispose = registerReturnsDeskTools(f.deps, f.context);

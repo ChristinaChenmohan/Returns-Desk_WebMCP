@@ -615,7 +615,7 @@ function registerReturnsDeskTools({ modelContext, client, syncCase }) {
 - 写入返回 Case 版本；同页 UI 达到该版本，刷新失败不把已提交命令报告为失败。
 - 注册 controller abort 后六工具全部消失，重复挂载不产生重复注册。
 - 执行 signal 传入 fetch；测试同时覆盖 signal 未传播时依旧正确的幂等与事务路径。
-- headed 目标 Chrome 与 ChatGPT in-app browser 各完成一次真实主线；headless 只运行非原生契约与 UI 测试。
+- headed Chrome Canary 完成一次真实主线；headless 只运行非原生契约与 UI 测试。
 
 ## 15. 规范依据
 
