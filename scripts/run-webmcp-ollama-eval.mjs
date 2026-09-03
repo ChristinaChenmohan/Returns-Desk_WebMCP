@@ -8,7 +8,7 @@ import {
 } from "webmcp-evals/dist/evaluator/browser.js";
 import { renderWebmcpReport } from "webmcp-evals/dist/report/report.js";
 import { evaluateExecutionTrajectory } from "webmcp-evals/dist/utils.js";
-import { buildBrowserLaunchOptions, parseRunnerArgs, runOllamaToolLoop, validateDemoUrl } from "./webmcp-ollama-runner-lib.mjs";
+import { buildAgentOverlayView, buildBrowserLaunchOptions, parseRunnerArgs, runOllamaToolLoop, validateDemoUrl } from "./webmcp-ollama-runner-lib.mjs";
 
 const cli = parseRunnerArgs(process.argv.slice(2));
 const baseUrl = cli.baseUrl ?? process.env.RETURNS_DESK_BASE_URL;
@@ -227,37 +227,46 @@ async function synchronizeDemoView(page, call) {
 }
 
 async function renderAgentOverlay(page, snapshot) {
-  await page.evaluate(({ prompt, history, state }) => {
+  const view = buildAgentOverlayView(snapshot);
+  await page.evaluate(({ promptExpanded, promptText, rows, state }) => {
     const id = "ollama-webmcp-demo-overlay";
     document.getElementById(id)?.remove();
     const overlay = document.createElement("aside");
     overlay.id = id;
     overlay.setAttribute("aria-label", "Ollama WebMCP Agent trace");
-    overlay.style.cssText = "position:fixed;right:18px;bottom:18px;width:410px;max-height:52vh;overflow:auto;z-index:2147483647;background:rgba(8,24,22,.96);color:#f5f3e9;border:1px solid #c9a85b;border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.34);padding:16px;font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace";
+    overlay.style.cssText = "position:fixed;right:18px;bottom:18px;width:min(460px,calc(100vw - 36px));height:min(68vh,620px);max-height:calc(100vh - 36px);box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;z-index:2147483647;background:rgba(8,24,22,.96);color:#f5f3e9;border:1px solid #c9a85b;border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.34);padding:16px;font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace";
     const title = document.createElement("strong");
     title.textContent = "LOCAL OLLAMA · WEBMCP AGENT";
-    title.style.cssText = "display:block;color:#f4d58d;margin-bottom:8px;letter-spacing:.06em";
+    title.style.cssText = "display:block;flex:none;color:#f4d58d;margin-bottom:8px;letter-spacing:.06em";
     const promptNode = document.createElement("div");
-    promptNode.textContent = prompt;
-    promptNode.style.cssText = "font-family:system-ui,sans-serif;margin-bottom:10px;color:#dce9e4";
+    promptNode.textContent = promptText;
+    promptNode.title = promptText;
+    promptNode.style.cssText = `flex:none;font-family:system-ui,sans-serif;margin-bottom:10px;color:#dce9e4;${promptExpanded ? "max-height:250px;overflow:auto" : "max-height:4.2em;overflow:hidden"}`;
     const stateNode = document.createElement("div");
     stateNode.textContent = state;
-    stateNode.style.cssText = "padding:7px 9px;background:#173d36;border-radius:8px;margin-bottom:8px;color:#bdebdc";
+    stateNode.style.cssText = "flex:none;padding:7px 9px;background:#173d36;border-radius:8px;margin-bottom:8px;color:#bdebdc";
     overlay.append(title, promptNode, stateNode);
-    for (const [index, step] of history.entries()) {
+    const trace = document.createElement("div");
+    trace.style.cssText = "flex:1;min-height:0;overflow:auto;padding-right:4px;scrollbar-gutter:stable";
+    for (const [index, step] of rows.entries()) {
       const row = document.createElement("div");
       row.style.cssText = "border-top:1px solid rgba(255,255,255,.12);padding-top:7px;margin-top:7px";
       const name = document.createElement("div");
       name.textContent = `${index + 1}. ${step.name}`;
       name.style.color = "#f4d58d";
-      const detail = document.createElement("div");
-      detail.textContent = `${JSON.stringify(step.args)} → ${JSON.stringify(step.result)}`;
-      detail.style.cssText = "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#b8cbc5";
-      row.append(name, detail);
-      overlay.append(row);
+      row.append(name);
+      if (step.expanded) {
+        const detail = document.createElement("div");
+        detail.textContent = `${JSON.stringify(step.args)} → ${JSON.stringify(step.result)}`;
+        detail.style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere;color:#b8cbc5;font-size:11.5px;line-height:1.35;margin-top:2px";
+        row.append(detail);
+      }
+      trace.append(row);
     }
+    overlay.append(trace);
     document.body.append(overlay);
-  }, snapshot);
+    trace.scrollTop = trace.scrollHeight;
+  }, view);
 }
 
 function unwrapData(result) {

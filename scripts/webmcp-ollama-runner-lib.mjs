@@ -35,6 +35,23 @@ export function buildBrowserLaunchOptions({ headed, chromeChannel, flags }) {
   };
 }
 
+export function buildAgentOverlayView({ prompt, history, state }) {
+  const promptExpanded = history.length === 0;
+  const promptLimit = 190;
+  const promptText = promptExpanded || prompt.length <= promptLimit
+    ? prompt
+    : `${prompt.slice(0, promptLimit - 1).trimEnd()}…`;
+  return {
+    promptExpanded,
+    promptText,
+    state,
+    rows: history.map((step, index) => ({
+      ...step,
+      expanded: index >= history.length - 2,
+    })),
+  };
+}
+
 export async function runOllamaToolLoop({
   initialMessages,
   availableTools,

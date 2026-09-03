@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  buildAgentOverlayView,
   buildBrowserLaunchOptions,
   parseRunnerArgs,
   runOllamaToolLoop,
@@ -7,6 +8,19 @@ import {
 } from "../../scripts/webmcp-ollama-runner-lib.mjs";
 
 describe("Ollama WebMCP demo runner", () => {
+  it("compacts the prompt after execution starts while preserving every tool step", () => {
+    const prompt = "Use the WebMCP tools registered by this page to prepare a return for ORD-1001. ".repeat(8).trim();
+    const history = Array.from({ length: 6 }, (_, index) => ({ name: `tool_${index + 1}`, args: {}, result: {} }));
+
+    const view = buildAgentOverlayView({ prompt, history, state: "Complete" });
+
+    expect(view.promptExpanded).toBe(false);
+    expect(view.promptText.length).toBeLessThan(prompt.length);
+    expect(view.promptText).toMatch(/…$/u);
+    expect(view.rows.map(row => row.name)).toEqual(["tool_1", "tool_2", "tool_3", "tool_4", "tool_5", "tool_6"]);
+    expect(view.rows.map(row => row.expanded)).toEqual([false, false, false, false, true, true]);
+  });
+
   it("supports an explicit headed recording mode", () => {
     expect(parseRunnerArgs([
       "--headed",
